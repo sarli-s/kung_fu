@@ -60,14 +60,21 @@ class Queen(Piece):
 
 class Pawn(Piece):
     def is_legal_move(self, from_row, from_col, to_row, to_col, dest="."):
-        direction = -1  # set per color in get_piece
         dr = to_row - from_row
         dc = abs(to_col - from_col)
-        if dc == 0:  # forward move — only to empty square
-            return dr == self._dir and dest == "."
-        if dc == 1:  # diagonal — only to capture an enemy
-            return dr == self._dir and dest != "."
+        if dc == 0 and dest == ".":
+            if dr == self._dir:
+                return True
+            if dr == 2 * self._dir and getattr(self, "_start_row", None) == from_row:
+                return True
+        if dc == 1 and dr == self._dir and dest != ".":
+            return True
         return False
+
+    def get_path(self, from_row, from_col, to_row, to_col):
+        if abs(to_row - from_row) == 2 and from_col == to_col:
+            return [(from_row + self._dir, from_col)]
+        return []
 
 _PIECE_MAP = {
     "K": King, "R": Rook, "B": Bishop, "N": Knight, "Q": Queen, "P": Pawn
@@ -78,5 +85,6 @@ def get_piece(token):
         piece = _PIECE_MAP[token[1]]()
         if token[1] == "P":
             piece._dir = -1 if token[0] == "w" else 1
+            piece._start_row = None  # set by board context
         return piece
     return None

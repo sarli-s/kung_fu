@@ -193,3 +193,122 @@ class TestBlockersAndCapture:
             ["click 50 50", "click 250 50", "wait 2000", "print board"]
         )
         assert result == ". . wR"
+
+
+# ── Advanced Real-Time Interaction ─────────────────────────────────────────────
+
+class TestAdvancedInteraction:
+    def _run(self, board_lines, cmds):
+        board, _ = parse_board(board_lines)
+        out = StringIO()
+        sys.stdout = out
+        handle_commands(board, cmds)
+        sys.stdout = sys.__stdout__
+        return out.getvalue().strip()
+
+    def test_enemy_collision_white_started_first(self):
+        result = self._run(
+            ["wR . . bR"],
+            ["click 50 50", "click 350 50",
+             "click 350 50", "click 50 50",
+             "wait 3000", "print board"]
+        )
+        assert result == ". . . wR"
+
+    def test_enemy_collision_black_started_first(self):
+        result = self._run(
+            ["wR . . bR"],
+            ["click 350 50", "click 50 50",
+             "click 50 50", "click 350 50",
+             "wait 3000", "print board"]
+        )
+        assert result == "bR . . ."
+
+    def test_cannot_start_move_through_friendly_piece(self):
+        result = self._run(
+            [". . .", "wR wP .", ". . ."],
+            ["click 50 150", "click 250 150", "wait 2000", "print board"]
+        )
+        assert result == ". . .\nwR wP .\n. . ."
+
+    def test_dynamic_block_tactic_not_in_common_route(self):
+        result = self._run(
+            [". . . .", "wQ . . bK", ". . bP .", ". . . ."],
+            ["click 50 150", "click 350 150",
+             "wait 200",
+             "click 250 250", "click 250 150",
+             "wait 3000", "print board"]
+        )
+        assert result == ". . . .\n. . . wQ\n. . bP .\n. . . ."
+
+    def test_knight_cannot_land_on_friendly_piece(self):
+        result = self._run(
+            [". wP .", ". . .", "wN . ."],
+            ["click 50 250", "click 150 50", "wait 1000", "print board"]
+        )
+        assert result == ". wP .\n. . .\nwN . ."
+
+    def test_premove_does_not_execute_in_common_route(self):
+        result = self._run(
+            ["wR . ."],
+            ["click 50 50", "click 150 50",
+             "click 50 50", "click 250 50",
+             "wait 2000", "print board"]
+        )
+        assert result == ". wR ."
+
+
+# ── Pawn Special Rules ─────────────────────────────────────────────────────────
+
+class TestPawnSpecialRules:
+    def _run(self, board_lines, cmds):
+        board, _ = parse_board(board_lines)
+        out = StringIO()
+        sys.stdout = out
+        handle_commands(board, cmds)
+        sys.stdout = sys.__stdout__
+        return out.getvalue().strip()
+
+    def test_white_pawn_double_step_from_start(self):
+        result = self._run(
+            [". . .", ". . .", ". . .", ". wP ."],
+            ["click 150 350", "click 150 150", "wait 2000", "print board"]
+        )
+        assert result == ". . .\n. wP .\n. . .\n. . ."
+
+    def test_white_pawn_double_step_blocked(self):
+        result = self._run(
+            [". . .", ". . .", ". bR .", ". wP ."],
+            ["click 150 350", "click 150 150", "wait 2000", "print board"]
+        )
+        assert result == ". . .\n. . .\n. bR .\n. wP ."
+
+    def test_white_pawn_double_step_from_non_start_invalid(self):
+        result = self._run(
+            [". . .", ". . .", ". wP .", ". . ."],
+            ["click 150 250", "click 150 50", "wait 2000", "print board"]
+        )
+        assert result == ". . .\n. . .\n. wP .\n. . ."
+
+    def test_white_pawn_promotes_to_queen(self):
+        result = self._run(
+            [". . .", ". wP ."],
+            ["click 150 150", "click 150 50", "wait 1000", "print board"]
+        )
+        assert result == ". wQ .\n. . ."
+
+    def test_black_pawn_promotes_to_queen(self):
+        result = self._run(
+            [". bP .", ". . ."],
+            ["click 150 50", "click 150 150", "wait 1000", "print board"]
+        )
+        assert result == ". . .\n. bQ ."
+
+    def test_promoted_queen_can_move_diagonally(self):
+        result = self._run(
+            [". . .", ". wP .", ". . ."],
+            ["click 150 150", "click 150 50", "wait 1000",
+             "click 150 50", "click 250 150", "wait 1000", "print board"]
+        )
+        assert result == ". . .\n. . wQ\n. . ."
+

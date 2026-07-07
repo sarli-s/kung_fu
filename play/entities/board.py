@@ -7,6 +7,7 @@ class Board:
         self.grid = [row[:] for row in grid]
         # each entry: (from_row, from_col, to_row, to_col, elapsed_ms)
         self._pending = []
+        self.game_over = False
 
     def cell(self, row, col):
         return self.grid[row][col]
@@ -48,6 +49,8 @@ class Board:
             token = self.grid[from_row][from_col]
             piece = get_piece(token)
             dest = self.grid[to_row][to_col]
+            if piece and token[1] == "P":
+                piece._start_row = (self.rows() - 1) if token[0] == "w" else 0
             if not piece or not piece.is_legal_move(from_row, from_col, to_row, to_col, dest=dest):
                 continue
             if dest != "." and dest[0] == token[0]:
@@ -55,7 +58,14 @@ class Board:
             if any(self.grid[r][c] != "." for r, c in piece.get_path(from_row, from_col, to_row, to_col)):
                 continue
             self.grid[from_row][from_col] = "."
-            self.grid[to_row][to_col] = token
+            if dest != "." and dest[1] == "K":
+                self.game_over = True
+            arrival = token
+            if token[1] == "P":
+                last_row = 0 if token[0] == "w" else self.rows() - 1
+                if to_row == last_row:
+                    arrival = token[0] + "Q"
+            self.grid[to_row][to_col] = arrival
         self._pending = still_pending
 
     def __str__(self):

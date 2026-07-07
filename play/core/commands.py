@@ -15,7 +15,7 @@ def handle_commands(board, commands):
             ms = int(cmd.split()[1])
             board.advance(ms)
             selected = None
-        elif cmd.startswith("click "):
+        elif cmd.startswith("click ") and not board.game_over:
             parts = cmd.split()
             x, y = int(parts[1]), int(parts[2])
             cell = _pixel_to_cell(board, x, y)

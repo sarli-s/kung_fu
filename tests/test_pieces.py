@@ -84,3 +84,23 @@ class TestPawn:
 
     def test_cannot_move_two_steps(self):
         assert self._white().is_legal_move(3, 1, 1, 1, dest=".") is False
+
+    def test_white_double_step_from_start_valid(self):
+        p = self._white(); p._start_row = 3
+        assert p.is_legal_move(3, 1, 1, 1, dest=".") is True
+
+    def test_black_double_step_from_start_valid(self):
+        p = self._black(); p._start_row = 0
+        assert p.is_legal_move(0, 1, 2, 1, dest=".") is True
+
+    def test_double_step_from_non_start_invalid(self):
+        p = self._white(); p._start_row = 3
+        assert p.is_legal_move(2, 1, 0, 1, dest=".") is False
+
+    def test_double_step_blocked_square_not_checked_by_piece(self):
+        # get_path returns the intermediate square for board to check
+        p = self._white(); p._start_row = 3
+        assert p.get_path(3, 1, 1, 1) == [(2, 1)]
+
+    def test_single_step_get_path_empty(self):
+        assert self._white().get_path(2, 1, 1, 1) == []
