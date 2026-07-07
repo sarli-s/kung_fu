@@ -1,4 +1,6 @@
 import pytest
+from io import StringIO
+import sys
 from play.core.parser import parse_input, parse_board
 from play.core.commands import handle_commands, _pixel_to_cell
 from play.entities.board import Board
@@ -144,3 +146,50 @@ class TestHandleCommands:
         board = self._make_board(["wK . .", ". . .", ". . ."])
         handle_commands(board, ["click 50 50", "click 250 250", "wait 1000"])
         assert board.cell(0, 0) == "wK"  # king can't jump 2 diagonally
+
+
+# ── Blockers & Capture ─────────────────────────────────────────────────────────
+
+class TestBlockersAndCapture:
+    def _run(self, board_lines, cmds):
+        board, _ = parse_board(board_lines)
+        out = StringIO()
+        sys.stdout = out
+        handle_commands(board, cmds)
+        sys.stdout = sys.__stdout__
+        return out.getvalue().strip()
+
+    def test_rook_blocked_by_own_piece(self):
+        result = self._run(
+            ["wR wP ."],
+            ["click 50 50", "click 250 50", "wait 2000", "print board"]
+        )
+        assert result == "wR wP ."
+
+    def test_bishop_blocked_by_own_piece(self):
+        result = self._run(
+            ["wB . .", ". wP .", ". . ."],
+            ["click 50 50", "click 250 250", "wait 2000", "print board"]
+        )
+        assert result == "wB . .\n. wP .\n. . ."
+
+    def test_knight_jumps_over_blockers(self):
+        result = self._run(
+            ["wN wP .", "wP . .", ". . ."],
+            ["click 50 50", "click 150 250", "wait 3000", "print board"]
+        )
+        assert result == ". wP .\nwP . .\n. wN ."
+
+    def test_cannot_capture_own_piece(self):
+        result = self._run(
+            ["wR . wP"],
+            ["click 50 50", "click 250 50", "wait 2000", "print board"]
+        )
+        assert result == "wR . wP"
+
+    def test_rook_captures_enemy_at_destination(self):
+        result = self._run(
+            ["wR . bR"],
+            ["click 50 50", "click 250 50", "wait 2000", "print board"]
+        )
+        assert result == ". . wR"

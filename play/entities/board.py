@@ -21,9 +21,15 @@ class Board:
         for from_row, from_col, to_row, to_col in self._pending:
             token = self.grid[from_row][from_col]
             piece = get_piece(token)
-            if piece and piece.is_legal_move(from_row, from_col, to_row, to_col):
-                self.grid[from_row][from_col] = "."
-                self.grid[to_row][to_col] = token
+            if not piece or not piece.is_legal_move(from_row, from_col, to_row, to_col):
+                continue
+            dest = self.grid[to_row][to_col]
+            if dest != "." and dest[0] == token[0]:  # same color
+                continue
+            if any(self.grid[r][c] != "." for r, c in piece.get_path(from_row, from_col, to_row, to_col)):
+                continue
+            self.grid[from_row][from_col] = "."
+            self.grid[to_row][to_col] = token
         self._pending.clear()
 
     def __str__(self):
