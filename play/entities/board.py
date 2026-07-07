@@ -1,3 +1,5 @@
+from play.entities.pieces import get_piece
+
 class Board:
     def __init__(self, grid):
         self.grid = [row[:] for row in grid]
@@ -17,9 +19,11 @@ class Board:
 
     def advance(self, ms):
         for from_row, from_col, to_row, to_col in self._pending:
-            piece = self.grid[from_row][from_col]
-            self.grid[from_row][from_col] = "."
-            self.grid[to_row][to_col] = piece
+            token = self.grid[from_row][from_col]
+            piece = get_piece(token)
+            if piece and piece.is_legal_move(from_row, from_col, to_row, to_col):
+                self.grid[from_row][from_col] = "."
+                self.grid[to_row][to_col] = token
         self._pending.clear()
 
     def __str__(self):
