@@ -1,12 +1,15 @@
 from play.entities.pieces import get_piece
 
 MOVE_TIME_PER_CELL = 1000  # ms per cell
+JUMP_DURATION = 1000  # ms
 
 class Board:
     def __init__(self, grid):
         self.grid = [row[:] for row in grid]
         # each entry: (from_row, from_col, to_row, to_col, elapsed_ms)
         self._pending = []
+        # airborne: {(row, col): remaining_ms}
+        self._airborne = {}
         self.game_over = False
 
     def cell(self, row, col):
@@ -20,6 +23,19 @@ class Board:
 
     def is_moving(self, row, col):
         return any(fr == row and fc == col for fr, fc, *_ in self._pending)
+
+    def is_airborne(self, row, col):
+        return (row, col) in self._airborne
+
+    def request_jump(self, row, col):
+        token = self.grid[row][col]
+        if token == ".":
+            return
+        if self.is_moving(row, col):
+            return
+        if self.is_airborne(row, col):
+            return
+        self._airborne[(row, col)] = JUMP_DURATION
 
     def _moving_color(self):
         """Returns the color ('w'/'b') of any piece currently in transit, or None."""
@@ -43,7 +59,7 @@ class Board:
         for from_row, from_col, to_row, to_col, elapsed in self._pending:
             elapsed += ms
             cells = max(abs(to_row - from_row), abs(to_col - from_col))
-            if elapsed < cells * MOVE_TIME_PER_CELL:
+            if elapsed < (cells - 1) * MOVE_TIME_PER_CELL:
                 still_pending.append((from_row, from_col, to_row, to_col, elapsed))
                 continue
             token = self.grid[from_row][from_col]
@@ -57,6 +73,13 @@ class Board:
                 continue
             if any(self.grid[r][c] != "." for r, c in piece.get_path(from_row, from_col, to_row, to_col)):
                 continue
+            # airborne capture: if destination has an airborne enemy, it captures the mover
+            if (to_row, to_col) in self._airborne:
+                airborne_token = self.grid[to_row][to_col]
+                if airborne_token != "." and airborne_token[0] != token[0]:
+                    # airborne piece captures the arriving mover — mover is removed
+                    self.grid[from_row][from_col] = "."
+                    continue
             self.grid[from_row][from_col] = "."
             if dest != "." and dest[1] == "K":
                 self.game_over = True
@@ -67,6 +90,13 @@ class Board:
                     arrival = token[0] + "Q"
             self.grid[to_row][to_col] = arrival
         self._pending = still_pending
+
+        # tick down airborne timers after processing arrivals
+        expired = [cell for cell, rem in self._airborne.items() if rem <= ms]
+        for cell in expired:
+            del self._airborne[cell]
+        for cell in list(self._airborne):
+            self._airborne[cell] -= ms
 
     def __str__(self):
         return "\n".join(" ".join(row) for row in self.grid)

@@ -86,3 +86,29 @@ class TestGameOver:
         # further clicks should be ignored
         handle_commands(board, ["click 50 50", "click 250 50"])
         assert board.cell(0, 2) == "wR"  # nothing moved
+
+
+class TestJump:
+    def _make(self, rows):
+        return Board([r.split() for r in rows])
+
+    def test_jump_piece_stays_in_cell(self):
+        board = self._make(["wK . ."])
+        board.request_jump(0, 0)
+        board.advance(1000)
+        assert board.cell(0, 0) == "wK"
+
+    def test_airborne_captures_arriving_enemy(self):
+        # wK is airborne at (0,0); bR moves from (0,1) to (0,0) — 1 cell, arrives in 1000ms
+        board = self._make(["wK bR ."])
+        board.request_jump(0, 0)
+        board.request_move(0, 1, 0, 0)
+        board.advance(1000)
+        assert board.cell(0, 0) == "wK"  # airborne piece survives
+        assert board.cell(0, 1) == "."   # mover was removed
+
+    def test_cannot_jump_while_moving(self):
+        board = self._make(["wR . ."])
+        board.request_move(0, 0, 0, 2)
+        board.request_jump(0, 0)  # should be ignored — piece is moving
+        assert board.is_airborne(0, 0) is False
