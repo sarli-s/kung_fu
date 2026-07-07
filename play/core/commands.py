@@ -25,11 +25,13 @@ def handle_commands(board, commands):
             piece = board.cell(row, col)
             if piece != ".":
                 if selected is not None and board.cell(selected[0], selected[1])[0] == piece[0]:
-                    # Friendly piece — replace selection
-                    selected = (row, col)
+                    # Friendly piece — replace selection (only if not moving)
+                    if not board.is_moving(row, col):
+                        selected = (row, col)
                 elif selected is None:
-                    # No selection — select this piece
-                    selected = (row, col)
+                    # No selection — select this piece (only if not moving)
+                    if not board.is_moving(row, col):
+                        selected = (row, col)
                 else:
                     # Enemy piece with active selection — capture (move request)
                     board.request_move(selected[0], selected[1], row, col)
