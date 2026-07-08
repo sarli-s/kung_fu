@@ -22,6 +22,16 @@ def _handle_jump(board, cmd, ctx):
     if cell is not None:
         board.request_jump(cell[0], cell[1])
 
+def _try_select(board, row, col, ctx):
+    if not board.is_moving(row, col):
+        ctx["selected"] = (row, col)
+
+def _try_move(board, row, col, ctx):
+    selected = ctx["selected"]
+    if selected is not None:
+        board.request_move(selected[0], selected[1], row, col)
+        ctx["selected"] = None
+
 def _handle_click(board, cmd, ctx):
     if ctx["game_over"]:
         return
@@ -34,18 +44,13 @@ def _handle_click(board, cmd, ctx):
     selected = ctx["selected"]
     if not board.is_empty(row, col):
         if selected is not None and board.same_color(selected[0], selected[1], row, col):
-            if not board.is_moving(row, col):
-                ctx["selected"] = (row, col)
+            _try_select(board, row, col, ctx)
         elif selected is None:
-            if not board.is_moving(row, col):
-                ctx["selected"] = (row, col)
+            _try_select(board, row, col, ctx)
         else:
-            board.request_move(selected[0], selected[1], row, col)
-            ctx["selected"] = None
+            _try_move(board, row, col, ctx)
     else:
-        if selected is not None:
-            board.request_move(selected[0], selected[1], row, col)
-            ctx["selected"] = None
+        _try_move(board, row, col, ctx)
 
 COMMAND_HANDLERS = {
     "print board": _handle_print,

@@ -4,8 +4,16 @@ MOVE_TIME_PER_CELL = 1000  # ms per cell
 JUMP_DURATION = 1000       # ms
 CELL_SIZE = 100            # pixels per cell
 
+EMPTY_CELL = "."
+COLOR_WHITE = "w"
+COLOR_BLACK = "b"
+PIECE_KING = "K"
+PIECE_PAWN = "P"
+PIECE_QUEEN = "Q"
+
 VALID_TOKENS = {
-    ".", "wK", "bK", "wQ", "bQ", "wR", "bR", "wN", "bN", "wB", "bB", "wP", "bP"
+    EMPTY_CELL,
+    "wK", "bK", "wQ", "bQ", "wR", "bR", "wN", "bN", "wB", "bB", "wP", "bP"
 }
 
 

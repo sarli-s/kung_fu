@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from play.config import EMPTY_CELL
 
 
 class TokenFormat(ABC):
@@ -31,7 +32,7 @@ class TextTokenFormat(TokenFormat):
         return value
 
     def empty(self) -> str:
-        return "."
+        return EMPTY_CELL
 
     def color(self, value) -> str:
         return value[0]
@@ -48,7 +49,7 @@ class BinaryTokenFormat(TokenFormat):
         return value.decode("utf-8")
 
     def empty(self) -> bytes:
-        return b"."
+        return EMPTY_CELL.encode("utf-8")
 
     def color(self, value) -> str:
         return chr(value[0])
