@@ -1,19 +1,26 @@
-from play.entities.pieces import get_piece
+from play.entities.pieces import PieceFactory
+from play.entities.rules import BoardRules, ChessBoardRules
+from play.utils.token_format import TextTokenFormat
+from play.utils.event_emitter import EventEmitter
+from play.core.game_commands import MoveCommand, JumpCommand
+from play.config import ChessConfig
 
-MOVE_TIME_PER_CELL = 1000  # ms per cell
-JUMP_DURATION = 1000  # ms
-
-class Board:
-    def __init__(self, grid):
-        self.grid = [row[:] for row in grid]
-        # each entry: (from_row, from_col, to_row, to_col, elapsed_ms)
+class Board(EventEmitter):
+    def __init__(self, grid, piece_factory=None, token_format=None, rules=None, config=None):
+        EventEmitter.__init__(self)
+        self._fmt = token_format or TextTokenFormat()
+        self._piece_factory = piece_factory or PieceFactory()
+        self._rules = rules or ChessBoardRules()
+        self._config = config or ChessConfig
+        self.grid = [[self._fmt.encode(cell) for cell in row] for row in grid]
+        # each entry: MoveCommand
         self._pending = []
-        # airborne: {(row, col): remaining_ms}
-        self._airborne = {}
+        # airborne: list of JumpCommand
+        self._airborne = []
         self.game_over = False
 
     def cell(self, row, col):
-        return self.grid[row][col]
+        return self._fmt.decode(self.grid[row][col])
 
     def rows(self):
         return len(self.grid)
@@ -21,82 +28,92 @@ class Board:
     def cols(self):
         return len(self.grid[0]) if self.grid else 0
 
+    def _empty(self):
+        return self._fmt.empty()
+
+    def is_empty(self, row, col):
+        return self.grid[row][col] == self._fmt.empty()
+
+    def same_color(self, row1, col1, row2, col2):
+        return self._fmt.color(self.grid[row1][col1]) == self._fmt.color(self.grid[row2][col2])
+
     def is_moving(self, row, col):
-        return any(fr == row and fc == col for fr, fc, *_ in self._pending)
+        return any(cmd.from_row == row and cmd.from_col == col for cmd in self._pending)
 
     def is_airborne(self, row, col):
-        return (row, col) in self._airborne
+        return any(cmd.row == row and cmd.col == col for cmd in self._airborne)
 
     def request_jump(self, row, col):
         token = self.grid[row][col]
-        if token == ".":
+        if token == self._empty():
             return
         if self.is_moving(row, col):
             return
         if self.is_airborne(row, col):
             return
-        self._airborne[(row, col)] = JUMP_DURATION
+        self._airborne.append(JumpCommand(row, col, self._config.jump_duration))
 
     def _moving_color(self):
-        """Returns the color ('w'/'b') of any piece currently in transit, or None."""
-        for fr, fc, *_ in self._pending:
-            token = self.grid[fr][fc]
-            if token != ".":
-                return token[0]
+        for cmd in self._pending:
+            token = self.grid[cmd.from_row][cmd.from_col]
+            if token != self._fmt.empty():
+                return self._fmt.color(token)
         return None
 
     def request_move(self, from_row, from_col, to_row, to_col):
         if self.is_moving(from_row, from_col):
-            return  # ignore redirect while in transit
+            return
         token = self.grid[from_row][from_col]
         moving_color = self._moving_color()
-        if moving_color is not None and token != "." and token[0] != moving_color:
-            return  # opposite color cannot move while another color is in transit
-        self._pending.append((from_row, from_col, to_row, to_col, 0))
+        if moving_color is not None and token != self._fmt.empty() and self._fmt.color(token) != moving_color:
+            return
+        self._pending.append(MoveCommand(from_row, from_col, to_row, to_col))
 
     def advance(self, ms):
         still_pending = []
-        for from_row, from_col, to_row, to_col, elapsed in self._pending:
-            elapsed += ms
-            cells = max(abs(to_row - from_row), abs(to_col - from_col))
-            if elapsed < (cells - 1) * MOVE_TIME_PER_CELL:
-                still_pending.append((from_row, from_col, to_row, to_col, elapsed))
+        empty = self._empty()
+        for cmd in self._pending:
+            cmd.elapsed += ms
+            cells = max(abs(cmd.to_row - cmd.from_row), abs(cmd.to_col - cmd.from_col))
+            if cmd.elapsed < (cells - 1) * self._config.move_time_per_cell:
+                still_pending.append(cmd)
                 continue
-            token = self.grid[from_row][from_col]
-            piece = get_piece(token)
-            dest = self.grid[to_row][to_col]
-            if piece and token[1] == "P":
-                piece._start_row = (self.rows() - 1) if token[0] == "w" else 0
-            if not piece or not piece.is_legal_move(from_row, from_col, to_row, to_col, dest=dest):
+            token = self.grid[cmd.from_row][cmd.from_col]
+            piece = self._piece_factory(self._fmt.decode(token))
+            dest = self.grid[cmd.to_row][cmd.to_col]
+            dest_text = self._fmt.decode(dest)
+            if piece:
+                self._rules.prepare_piece(token, piece, self, self._fmt)
+            if not piece or not piece.is_legal_move(cmd, dest=dest_text):
                 continue
-            if dest != "." and dest[0] == token[0]:
+            if dest != empty and self._fmt.color(dest) == self._fmt.color(token):
                 continue
-            if any(self.grid[r][c] != "." for r, c in piece.get_path(from_row, from_col, to_row, to_col)):
+            if any(self.grid[r][c] != empty for r, c in piece.get_path(cmd)):
                 continue
-            # airborne capture: if destination has an airborne enemy, it captures the mover
-            if (to_row, to_col) in self._airborne:
-                airborne_token = self.grid[to_row][to_col]
-                if airborne_token != "." and airborne_token[0] != token[0]:
-                    # airborne piece captures the arriving mover — mover is removed
-                    self.grid[from_row][from_col] = "."
+            airborne_cmd = next((j for j in self._airborne if j.row == cmd.to_row and j.col == cmd.to_col), None)
+            if airborne_cmd is not None:
+                airborne_token = self.grid[cmd.to_row][cmd.to_col]
+                if airborne_token != empty and self._fmt.color(airborne_token) != self._fmt.color(token):
+                    self.grid[cmd.from_row][cmd.from_col] = empty
                     continue
-            self.grid[from_row][from_col] = "."
-            if dest != "." and dest[1] == "K":
+            self.grid[cmd.from_row][cmd.from_col] = empty
+            if dest != empty and self._rules.is_royal(dest, self._fmt):
                 self.game_over = True
-            arrival = token
-            if token[1] == "P":
-                last_row = 0 if token[0] == "w" else self.rows() - 1
-                if to_row == last_row:
-                    arrival = token[0] + "Q"
-            self.grid[to_row][to_col] = arrival
+                self.emit("on_game_over", winner=self._fmt.color(token))
+            elif dest != empty:
+                self.emit("on_capture", captured=dest_text, by=self._fmt.decode(token), row=cmd.to_row, col=cmd.to_col)
+            promoted = self._rules.get_promotion(token, cmd.to_row, self, self._fmt)
+            arrival = promoted or token
+            if promoted:
+                self.emit("on_promotion", piece=self._fmt.decode(arrival), row=cmd.to_row, col=cmd.to_col)
+            self.grid[cmd.to_row][cmd.to_col] = arrival
         self._pending = still_pending
 
-        # tick down airborne timers after processing arrivals
-        expired = [cell for cell, rem in self._airborne.items() if rem <= ms]
-        for cell in expired:
-            del self._airborne[cell]
-        for cell in list(self._airborne):
-            self._airborne[cell] -= ms
+        expired = [j for j in self._airborne if j.remaining <= ms]
+        for j in expired:
+            self._airborne.remove(j)
+        for j in self._airborne:
+            j.remaining -= ms
 
     def __str__(self):
-        return "\n".join(" ".join(row) for row in self.grid)
+        return "\n".join(" ".join(self._fmt.decode(cell) for cell in row) for row in self.grid)
