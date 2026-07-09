@@ -63,6 +63,10 @@ python main.py < input.txt
 python -m pytest tests/
 ```
 
+## 🧪 Testing
+
+Please note that the tests directory is currently undergoing refactoring and cleanup. Some test files may be disorganized as architecture updates are being finalized.
+
 ## GitHub
 
 https://github.com/sarli-s/kung_fu
