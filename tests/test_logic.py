@@ -1,20 +1,22 @@
 import pytest
 from io import StringIO
 import sys
-from play.core.parser import parse_input, parse_board
-from play.core.commands import handle_commands, _pixel_to_cell
-from play.entities.board import Board
+from chess.services.input_parser import parse_input
+from chess.services.board_builder import build_board
+from chess.core.controller import handle_commands, _pixel_to_cell
+from chess.core.session import GameEngine
+from chess.entities.board import Board
 
 
-def _make_board(rows):
-    return Board([row.split() for row in rows])
+def _make_engine(rows):
+    return GameEngine(Board([row.split() for row in rows]))
 
 
 def _run(board_lines, cmds):
-    board, _ = parse_board(board_lines)
+    engine, _ = build_board(board_lines)
     out = StringIO()
     sys.stdout = out
-    handle_commands(board, cmds)
+    handle_commands(engine, cmds)
     sys.stdout = sys.__stdout__
     return out.getvalue().strip()
 
@@ -44,112 +46,111 @@ class TestParseInput:
         assert cmd_lines == ["click 50 50", "wait 1000", "print board"]
 
 
-# ── parse_board ────────────────────────────────────────────────────────────────
+# ── build_board ────────────────────────────────────────────────────────────────
 
 class TestParseBoard:
     def test_valid_board(self):
-        board, error = parse_board(["wK . .", ". . .", ". . ."])
+        engine, error = build_board(["wK . .", ". . .", ". . ."])
         assert error is None
-        assert board.cell(0, 0) == "wK"
-        assert board.cell(0, 1) == "."
+        assert engine.cell(0, 0) == "wK"
+        assert engine.cell(0, 1) == "."
 
     def test_unknown_token_returns_error(self):
-        board, error = parse_board(["wK XX ."])
-        assert board is None
+        engine, error = build_board(["wK XX ."])
+        assert engine is None
         assert error == "ERROR UNKNOWN_TOKEN"
 
     def test_row_width_mismatch_returns_error(self):
-        board, error = parse_board(["wK . .", ". ."])
-        assert board is None
+        engine, error = build_board(["wK . .", ". ."])
+        assert engine is None
         assert error == "ERROR ROW_WIDTH_MISMATCH"
 
     def test_all_valid_tokens_accepted(self):
-        board, error = parse_board(["wK bK wQ bQ wR bR wN bN wB bB wP bP ."])
+        engine, error = build_board(["wK bK wQ bQ wR bR wN bN wB bB wP bP ."])
         assert error is None
 
 
-# ── Board ──────────────────────────────────────────────────────────────────────
+# ── GameEngine (Board interface) ───────────────────────────────────────────────
 
 class TestBoard:
     def test_cell_returns_correct_token(self):
-        board = _make_board(["wK . ."])
-        assert board.cell(0, 0) == "wK"
-        assert board.cell(0, 1) == "."
+        engine = _make_engine(["wK . ."])
+        assert engine.cell(0, 0) == "wK"
+        assert engine.cell(0, 1) == "."
 
     def test_rows_and_cols(self):
-        board = _make_board(["wK . .", ". . ."])
-        assert board.rows() == 2
-        assert board.cols() == 3
+        engine = _make_engine(["wK . .", ". . ."])
+        assert engine.rows() == 2
+        assert engine.cols() == 3
 
     def test_request_move_does_not_move_immediately(self):
-        board = _make_board(["wK . ."])
-        board.request_move(0, 0, 0, 1)
-        assert board.cell(0, 0) == "wK"  # still there
+        engine = _make_engine(["wK . ."])
+        engine.request_move(0, 0, 0, 1)
+        assert engine.cell(0, 0) == "wK"
 
     def test_advance_applies_legal_move(self):
-        board = _make_board(["wK . ."])
-        board.request_move(0, 0, 0, 1)
-        board.advance(1000)
-        assert board.cell(0, 0) == "."
-        assert board.cell(0, 1) == "wK"
+        engine = _make_engine(["wK . ."])
+        engine.request_move(0, 0, 0, 1)
+        engine.advance(1000)
+        assert engine.cell(0, 0) == "."
+        assert engine.cell(0, 1) == "wK"
 
     def test_advance_rejects_illegal_move(self):
-        board = _make_board(["wK . .", ". . .", ". . ."])
-        board.request_move(0, 0, 2, 2)  # king can't move 2 steps
-        board.advance(1000)
-        assert board.cell(0, 0) == "wK"  # stayed
+        engine = _make_engine(["wK . .", ". . .", ". . ."])
+        engine.request_move(0, 0, 2, 2)
+        engine.advance(1000)
+        assert engine.cell(0, 0) == "wK"
 
     def test_advance_clears_pending(self):
-        board = _make_board(["wK . ."])
-        board.request_move(0, 0, 0, 1)
-        board.advance(1000)
-        board.advance(1000)  # second advance should do nothing
-        assert board.cell(0, 1) == "wK"
-        assert board.cell(0, 2) == "."
+        engine = _make_engine(["wK . ."])
+        engine.request_move(0, 0, 0, 1)
+        engine.advance(1000)
+        engine.advance(1000)
+        assert engine.cell(0, 1) == "wK"
+        assert engine.cell(0, 2) == "."
 
     def test_str_output(self):
-        board = _make_board(["wK . .", ". . ."])
-        assert str(board) == "wK . .\n. . ."
+        engine = _make_engine(["wK . .", ". . ."])
+        assert str(engine) == "wK . .\n. . ."
 
 
 # ── _pixel_to_cell ─────────────────────────────────────────────────────────────
 
 class TestPixelToCell:
     def test_converts_pixel_to_cell(self):
-        board = _make_board(["wK . .", ". . .", ". . ."])
-        assert _pixel_to_cell(board, 50, 50) == (0, 0)
-        assert _pixel_to_cell(board, 150, 150) == (1, 1)
-        assert _pixel_to_cell(board, 250, 250) == (2, 2)
+        engine = _make_engine(["wK . .", ". . .", ". . ."])
+        assert _pixel_to_cell(engine, 50, 50) == (0, 0)
+        assert _pixel_to_cell(engine, 150, 150) == (1, 1)
+        assert _pixel_to_cell(engine, 250, 250) == (2, 2)
 
     def test_out_of_bounds_returns_none(self):
-        board = _make_board(["wK . ."])
-        assert _pixel_to_cell(board, 999, 999) is None
+        engine = _make_engine(["wK . ."])
+        assert _pixel_to_cell(engine, 999, 999) is None
 
 
 # ── handle_commands ────────────────────────────────────────────────────────────
 
 class TestHandleCommands:
     def test_click_selects_then_moves_on_wait(self):
-        board = _make_board(["wK . .", ". . .", ". . ."])
-        handle_commands(board, ["click 50 50", "click 150 150", "wait 1000"])
-        assert board.cell(0, 0) == "."
-        assert board.cell(1, 1) == "wK"
+        engine = _make_engine(["wK . .", ". . .", ". . ."])
+        handle_commands(engine, ["click 50 50", "click 150 150", "wait 1000"])
+        assert engine.cell(0, 0) == "."
+        assert engine.cell(1, 1) == "wK"
 
     def test_click_on_empty_without_selection_does_nothing(self):
-        board = _make_board(["wK . ."])
-        handle_commands(board, ["click 150 0", "wait 1000"])
-        assert board.cell(0, 0) == "wK"
+        engine = _make_engine(["wK . ."])
+        handle_commands(engine, ["click 150 0", "wait 1000"])
+        assert engine.cell(0, 0) == "wK"
 
     def test_clicking_friendly_piece_switches_selection(self):
-        board = _make_board(["wK . wR"])
-        handle_commands(board, ["click 50 0", "click 250 0", "wait 1000"])
-        # wR was selected last, wK should not have moved
-        assert board.cell(0, 0) == "wK"
+        engine = _make_engine(["wK . wR"])
+        handle_commands(engine, ["click 50 0", "click 250 0", "wait 1000"])
+        assert engine.cell(0, 0) == "wK"
 
     def test_illegal_move_leaves_board_unchanged(self):
-        board = _make_board(["wK . .", ". . .", ". . ."])
-        handle_commands(board, ["click 50 50", "click 250 250", "wait 1000"])
-        assert board.cell(0, 0) == "wK"  # king can't jump 2 diagonally
+        engine = _make_engine(["wK . .", ". . .", ". . ."])
+        handle_commands(engine, ["click 50 50", "click 250 250", "wait 1000"])
+        assert engine.cell(0, 0) == "wK"
 
 
 # ── Blockers & Capture ─────────────────────────────────────────────────────────

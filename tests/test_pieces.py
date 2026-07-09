@@ -1,6 +1,7 @@
 import pytest
-from play.entities.pieces import Piece, StepMover, SlideMover, PawnMover, PieceFactory, get_piece, CHESS_PIECE_DESCRIPTORS
-from play.entities.move import Move
+from chess.entities.pieces import Piece, PieceFactory, get_piece, CHESS_PIECE_DESCRIPTORS
+from chess.entities.move import Move
+from chess.rules.movement import  StepMover, SlideMover, PawnMover
 
 
 def _king():   return Piece(CHESS_PIECE_DESCRIPTORS["K"]("wK"))
@@ -70,40 +71,40 @@ class TestPawn:
         return Piece(PawnMover(forward=(1, 0)))
 
     def test_white_moves_up(self):
-        assert self._white().is_legal_move(Move(2, 1, 1, 1), dest=".") is True
+        assert self._white().is_legal_move(Move(2, 1, 1, 1), dest_empty=True) is True
 
     def test_white_cannot_move_down(self):
-        assert self._white().is_legal_move(Move(1, 1, 2, 1), dest=".") is False
+        assert self._white().is_legal_move(Move(1, 1, 2, 1), dest_empty=True) is False
 
     def test_black_moves_down(self):
-        assert self._black().is_legal_move(Move(1, 1, 2, 1), dest=".") is True
+        assert self._black().is_legal_move(Move(1, 1, 2, 1), dest_empty=True) is True
 
     def test_black_cannot_move_up(self):
-        assert self._black().is_legal_move(Move(2, 1, 1, 1), dest=".") is False
+        assert self._black().is_legal_move(Move(2, 1, 1, 1), dest_empty=True) is False
 
     def test_forward_blocked_by_enemy(self):
-        assert self._white().is_legal_move(Move(2, 1, 1, 1), dest="bR") is False
+        assert self._white().is_legal_move(Move(2, 1, 1, 1), dest_empty=False) is False
 
     def test_diagonal_capture_valid(self):
-        assert self._white().is_legal_move(Move(2, 1, 1, 0), dest="bR") is True
+        assert self._white().is_legal_move(Move(2, 1, 1, 0), dest_empty=False) is True
 
     def test_diagonal_capture_empty_invalid(self):
-        assert self._white().is_legal_move(Move(2, 1, 1, 0), dest=".") is False
+        assert self._white().is_legal_move(Move(2, 1, 1, 0), dest_empty=True) is False
 
     def test_cannot_move_two_steps(self):
-        assert self._white().is_legal_move(Move(3, 1, 1, 1), dest=".") is False
+        assert self._white().is_legal_move(Move(3, 1, 1, 1), dest_empty=True) is False
 
     def test_white_double_step_from_start_valid(self):
         p = self._white(); p.mover.start_row = 3
-        assert p.is_legal_move(Move(3, 1, 1, 1), dest=".") is True
+        assert p.is_legal_move(Move(3, 1, 1, 1), dest_empty=True) is True
 
     def test_black_double_step_from_start_valid(self):
         p = self._black(); p.mover.start_row = 0
-        assert p.is_legal_move(Move(0, 1, 2, 1), dest=".") is True
+        assert p.is_legal_move(Move(0, 1, 2, 1), dest_empty=True) is True
 
     def test_double_step_from_non_start_invalid(self):
         p = self._white(); p.mover.start_row = 3
-        assert p.is_legal_move(Move(2, 1, 0, 1), dest=".") is False
+        assert p.is_legal_move(Move(2, 1, 0, 1), dest_empty=True) is False
 
     def test_double_step_blocked_square_not_checked_by_piece(self):
         p = self._white(); p.mover.start_row = 3

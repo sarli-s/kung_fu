@@ -1,27 +1,22 @@
 from abc import ABC, abstractmethod
-from play.config import EMPTY_CELL
+from chess.config import EMPTY_CELL
 
 
 class TokenFormat(ABC):
     @abstractmethod
-    def encode(self, token: str):
-        """Convert a canonical text token (e.g. 'wK', '.') to internal storage format."""
+    def encode(self, token: str): pass
 
     @abstractmethod
-    def decode(self, value) -> str:
-        """Convert an internal storage value back to a canonical text token."""
+    def decode(self, value) -> str: pass
 
     @abstractmethod
-    def empty(self):
-        """Returns the encoded representation of an empty cell."""
+    def empty(self): pass
 
     @abstractmethod
-    def color(self, value) -> str:
-        """Extracts color ('w'/'b') from an encoded token."""
+    def color(self, value) -> str: pass
 
     @abstractmethod
-    def piece_type(self, value) -> str:
-        """Extracts piece type ('K','Q','R',...) from an encoded token."""
+    def piece_type(self, value) -> str: pass
 
 
 class TextTokenFormat(TokenFormat):

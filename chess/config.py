@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 
-MOVE_TIME_PER_CELL = 1000  # ms per cell
-JUMP_DURATION = 1000       # ms
-CELL_SIZE = 100            # pixels per cell
+MOVE_TIME_PER_CELL = 1000
+JUMP_DURATION = 1000
+CELL_SIZE = 100
 
 EMPTY_CELL = "."
 COLOR_WHITE = "w"
