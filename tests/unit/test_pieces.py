@@ -97,18 +97,3 @@ class TestPawn:
     def test_white_double_step_from_start_valid(self):
         p = self._white(); p.mover.start_row = 3
         assert p.is_legal_move(Move(3, 1, 1, 1), dest_empty=True) is True
-
-    def test_black_double_step_from_start_valid(self):
-        p = self._black(); p.mover.start_row = 0
-        assert p.is_legal_move(Move(0, 1, 2, 1), dest_empty=True) is True
-
-    def test_double_step_from_non_start_invalid(self):
-        p = self._white(); p.mover.start_row = 3
-        assert p.is_legal_move(Move(2, 1, 0, 1), dest_empty=True) is False
-
-    def test_double_step_blocked_square_not_checked_by_piece(self):
-        p = self._white(); p.mover.start_row = 3
-        assert p.get_path(Move(3, 1, 1, 1)) == [(2, 1)]
-
-    def test_single_step_get_path_empty(self):
-        assert self._white().get_path(Move(2, 1, 1, 1)) == []

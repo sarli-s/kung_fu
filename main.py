@@ -1,16 +1,16 @@
-#Repo URL 
-#https://github.com/sarli-s/kung_fu
-
 import sys
-from play.core.parser import parse_input, parse_board
-from play.core.commands import handle_commands
+from chess.services.input_parser import parse_input
+from chess.services.board_builder import build_board
+from chess.core.controller import handle_commands
+from chess.utils.errors import ChessError
 
-def main(parser=parse_board, handler=handle_commands):
+def main(parser=build_board, handler=handle_commands):
     text = sys.stdin.read()
     board_lines, command_lines = parse_input(text)
-    board, error = parser(board_lines)
-    if error:
-        print(error)
+    try:
+        board = parser(board_lines)
+    except ChessError as e:
+        print(e)
         return
     handler(board, command_lines)
 

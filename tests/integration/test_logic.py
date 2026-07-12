@@ -6,6 +6,8 @@ from chess.services.board_builder import build_board
 from chess.core.controller import handle_commands, _pixel_to_cell
 from chess.core.session import GameEngine
 from chess.entities.board import Board
+from chess.utils.token_format import TokenFormat
+from chess.utils.errors import UnknownTokenError, RowWidthMismatchError
 
 
 def _make_engine(rows):
@@ -13,7 +15,7 @@ def _make_engine(rows):
 
 
 def _run(board_lines, cmds):
-    engine, _ = build_board(board_lines)
+    engine = build_board(board_lines)
     out = StringIO()
     sys.stdout = out
     handle_commands(engine, cmds)
@@ -50,24 +52,43 @@ class TestParseInput:
 
 class TestParseBoard:
     def test_valid_board(self):
-        engine, error = build_board(["wK . .", ". . .", ". . ."])
-        assert error is None
+        engine = build_board(["wK . .", ". . .", ". . ."])
         assert engine.cell(0, 0) == "wK"
         assert engine.cell(0, 1) == "."
 
     def test_unknown_token_returns_error(self):
-        engine, error = build_board(["wK XX ."])
-        assert engine is None
-        assert error == "ERROR UNKNOWN_TOKEN"
+        with pytest.raises(UnknownTokenError):
+            build_board(["wK XX ."])
 
     def test_row_width_mismatch_returns_error(self):
-        engine, error = build_board(["wK . .", ". ."])
-        assert engine is None
-        assert error == "ERROR ROW_WIDTH_MISMATCH"
+        with pytest.raises(RowWidthMismatchError):
+            build_board(["wK . .", ". ."])
 
     def test_all_valid_tokens_accepted(self):
-        engine, error = build_board(["wK bK wQ bQ wR bR wN bN wB bB wP bP ."])
-        assert error is None
+        engine = build_board(["wK bK wQ bQ wR bR wN bN wB bB wP bP ."])
+        assert engine is not None
+
+    def test_build_board_accepts_custom_token_format(self):
+        class CustomTokenFormat(TokenFormat):
+            def encode(self, token: str):
+                return (token, token)
+
+            def decode(self, value):
+                return value[0]
+
+            def empty(self):
+                return (".", ".")
+
+            def color(self, value) -> str:
+                return value[0][0]
+
+            def piece_type(self, value) -> str:
+                return value[0][1]
+
+        engine = build_board(["wK ."], token_format=CustomTokenFormat())
+        assert engine is not None
+        assert engine.cell(0, 0) == "wK"
+        assert engine.cell(0, 1) == "."
 
 
 # ── GameEngine (Board interface) ───────────────────────────────────────────────

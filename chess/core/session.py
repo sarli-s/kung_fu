@@ -67,7 +67,7 @@ class GameEngine(EventEmitter):
     def _try_resolve(self, cmd, ms):
         cmd.elapsed += ms
         cells = max(abs(cmd.to_row - cmd.from_row), abs(cmd.to_col - cmd.from_col))
-        if cmd.elapsed < (cells - 1) * self._config.move_time_per_cell:
+        if cmd.elapsed < (cells) * self._config.move_time_per_cell:
             return False
         return self._execute_move(cmd)
 
