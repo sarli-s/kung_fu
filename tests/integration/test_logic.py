@@ -245,9 +245,9 @@ class TestAdvancedInteraction:
 class TestPawnSpecialRules:
     def test_white_pawn_double_step_from_start(self):
         assert _run(
-            [". . .", ". . .", ". . .", ". wP ."],
+            [". . . .", ". . . .", ". . . .", ". wP . .", ". . . ."],
             ["click 150 350", "click 150 150", "wait 2000", "print board"]
-        ) == ". . .\n. wP .\n. . .\n. . ."
+        ) == ". . . .\n. wP . .\n. . . .\n. . . .\n. . . ."
 
     def test_white_pawn_double_step_blocked(self):
         assert _run(
@@ -257,9 +257,9 @@ class TestPawnSpecialRules:
 
     def test_white_pawn_double_step_from_non_start_invalid(self):
         assert _run(
-            [". . .", ". . .", ". wP .", ". . ."],
+            [". . . .", ". . . .", ". wP . .", ". . . .", ". . . ."],
             ["click 150 250", "click 150 50", "wait 2000", "print board"]
-        ) == ". . .\n. . .\n. wP .\n. . ."
+        ) == ". . . .\n. . . .\n. wP . .\n. . . .\n. . . ."
 
     def test_white_pawn_promotes_to_queen(self):
         assert _run(

@@ -17,6 +17,17 @@ class GameEngine(EventEmitter):
         self._config = config or ChessConfig
         self._clock = RealTimeArbiter(self._config)
         self.game_over = False
+        self._pawn_start_rows = self._record_pawn_starts()
+
+    def _record_pawn_starts(self):
+        starts = {}
+        fmt = self._fmt
+        for r in range(self._board.rows()):
+            for c in range(self._board.cols()):
+                token = self._board.get_raw(r, c)
+                if token != fmt.empty() and fmt.piece_type(token) == "P":
+                    starts[(r, c)] = r
+        return starts
 
     # ── Public read interface (delegates to board/clock) ───────────────────────
 
@@ -80,7 +91,8 @@ class GameEngine(EventEmitter):
 
         piece = self._piece_factory(fmt.decode(token))
         if piece:
-            self._rules.prepare_piece(token, piece, self._board, fmt)
+            start_row = self._pawn_start_rows.get((cmd.from_row, cmd.from_col))
+            self._rules.prepare_piece(token, piece, self._board, fmt, from_row=start_row)
 
         if not piece or not piece.is_legal_move(cmd, dest_empty=self._board.is_empty(cmd.to_row, cmd.to_col)):
             return True
