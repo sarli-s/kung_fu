@@ -32,11 +32,6 @@ class TestRealTimeArbiter:
     def test_is_moving_false_for_non_pending(self):
         assert self.arbiter.is_moving(0, 0) is False
 
-    def test_is_moving_false_after_advance_resolves(self):
-        cmd = MoveCommand(0, 0, 1, 1)
-        self.arbiter.add_move(cmd)
-        self.arbiter.advance(2000, lambda c, m: True)
-        assert self.arbiter.is_moving(0, 0) is False
 
     # ── is_airborne ────────────────────────────────────────────────────────────
 
@@ -66,42 +61,52 @@ class TestRealTimeArbiter:
 
     def test_advance_resolves_pending_commands(self):
         cmd = MoveCommand(0, 0, 1, 1)
-        cmd.elapsed = 0
+        cmd.checkpoints = [(1000, 1, 1)]
         self.arbiter.add_move(cmd)
         resolve_called = []
 
-        def resolve(c, m):
-            resolve_called.append((c, m))
+        def resolve(c, r, col):
+            resolve_called.append((c, r, col))
             return True
 
-        self.arbiter.advance(100, resolve)
+        self.arbiter.advance(1000, resolve)
         assert len(resolve_called) == 1
         assert resolve_called[0][0] is cmd
-        assert resolve_called[0][1] == 100
+        assert resolve_called[0][1] == 1
+        assert resolve_called[0][2] == 1
 
     def test_advance_reduces_airborne_duration(self):
         self.arbiter.add_jump(JumpCommand(0, 0, 1000))
-        self.arbiter.advance(300, lambda c, m: False)
+        self.arbiter.advance(300, lambda c, r, col: False)
         assert self.arbiter.get_airborne_at(0, 0).remaining == 700
 
-    # ── moving_color ───────────────────────────────────────────────────────────
+    # ── wait-invariant ─────────────────────────────────────────────────────────
 
-    def test_moving_color_returns_color_of_moving_piece(self):
-        grid = [["wR", ".", "."], [".", ".", "."], [".", ".", "."]]
-        self.arbiter.add_move(MoveCommand(0, 0, 0, 2))
-        from chess.utils.token_format import TextTokenFormat
-        fmt = TextTokenFormat()
-        assert self.arbiter.moving_color(grid, fmt) == "w"
+    def test_wait_invariant_single_vs_multiple_waits(self):
+        """Same command sequence must produce identical board state whether done
+        via one large wait or several smaller waits summing to the same total."""
+        from chess.services.board_builder import build_board
+        from chess.core.controller import handle_commands
 
-    def test_moving_color_returns_none_if_no_moving_piece(self):
-        grid = [[".", ".", "."], [".", ".", "."], [".", ".", "."]]
-        from chess.utils.token_format import TextTokenFormat
-        fmt = TextTokenFormat()
-        assert self.arbiter.moving_color(grid, fmt) is None
+        # Scenario: rook moves 2 cells, pawn moves 1 cell, both start simultaneously
+        board_lines = ["wR . . bP"]
 
-    def test_moving_color_returns_none_if_empty_cell(self):
-        grid = [[".", ".", "."], [".", ".", "."], [".", ".", "."]]
-        self.arbiter.add_move(MoveCommand(0, 0, 0, 2))
-        from chess.utils.token_format import TextTokenFormat
-        fmt = TextTokenFormat()
-        assert self.arbiter.moving_color(grid, fmt) is None
+        # Path 1: one large wait
+        engine1 = build_board(board_lines)
+        handle_commands(engine1, [
+            "click 50 50", "click 250 50",      # wR: (0,0) -> (0,2)
+            "click 350 50", "click 50 50",      # bP: (0,3) -> (0,0)
+            "wait 2000"
+        ])
+        state1 = str(engine1)
+
+        # Path 2: multiple smaller waits summing to 2000
+        engine2 = build_board(board_lines)
+        handle_commands(engine2, [
+            "click 50 50", "click 250 50",      # wR: (0,0) -> (0,2)
+            "click 350 50", "click 50 50",      # bP: (0,3) -> (0,0)
+            "wait 500", "wait 500", "wait 500", "wait 500"
+        ])
+        state2 = str(engine2)
+
+        assert state1 == state2

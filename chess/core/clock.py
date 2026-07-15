@@ -5,7 +5,7 @@ from chess.entities.move_command import MoveCommand
 class RealTimeArbiter:
     def __init__(self, config):
         self._config = config
-        self._pending = []
+        self._pending = []   # active MoveCommands (board not yet mutated)
         self._airborne = []
 
     def add_move(self, cmd: MoveCommand):
@@ -23,18 +23,34 @@ class RealTimeArbiter:
     def get_airborne_at(self, row, col):
         return next((j for j in self._airborne if j.row == row and j.col == col), None)
 
-    def advance(self, ms, resolve_fn):
-        self._pending = [cmd for cmd in self._pending if not resolve_fn(cmd, ms)]
+    def inflight_positions(self, cmd):
+        return {(c.current_row, c.current_col) for c in self._pending if c is not cmd}
+
+    def advance(self, ms, resolve_checkpoint_fn):
+        for cmd in self._pending:
+            cmd.elapsed += ms
+
+        # collect all checkpoints due this tick across all moves, preserve FIFO registration order
+        due = sorted(
+            [(cmd, due_time, r, c)
+             for cmd in self._pending
+             for (due_time, r, c) in cmd.checkpoints
+             if due_time <= cmd.elapsed],
+            key=lambda x: (x[1], self._pending.index(x[0]))
+        )
+
+        resolved = set()
+        for cmd, due_time, r, c in due:
+            if id(cmd) in resolved:
+                continue
+            finished = resolve_checkpoint_fn(cmd, r, c)
+            if finished:
+                resolved.add(id(cmd))
+
+        self._pending = [cmd for cmd in self._pending if id(cmd) not in resolved]
         self._tick_airborne(ms)
 
     def _tick_airborne(self, ms):
         self._airborne = [j for j in self._airborne if j.remaining > ms]
         for j in self._airborne:
             j.remaining -= ms
-
-    def moving_color(self, grid, fmt):
-        for cmd in self._pending:
-            token = grid[cmd.from_row][cmd.from_col]
-            if token != fmt.empty():
-                return fmt.color(token)
-        return None

@@ -9,20 +9,31 @@ This project explores chess movement, captures, promotions, and command-based ga
 ## Project Structure
 
 - main.py — entry point
-- chess/ — engine, rules, board logic, and commands
+- chess/
+  - core/ — GameEngine and session management
+  - entities/ — Board, pieces, and piece factory
+  - rules/ — ChessBoardRules and game logic
+  - config/ — ChessConfig and constants
 - tests/ — unit tests
 - assets/ — fonts, images, and sounds
+
+## Features
+
+- **GameEngine** — Core engine managing board state, piece movement, and game logic
+- **Movement System** — Request-based movement with duration-based execution
+- **Jump Mechanics** — Airborne state management for pieces
+- **Captures** — Automatic enemy piece capture with event emission
+- **Pawn Promotion** — Automatic promotion to Queen upon reaching the opposite end
+- **Event System** — Subscribe to game events (on_capture, on_promotion, on_game_over)
+- **Game Over Detection** — Automatic detection when a King is captured
 
 ## Run the Tests
 
 ```bash
 python -m pytest tests/
-
-
-## 🧪 Testing
-
-Please note that the tests directory is currently undergoing refactoring and cleanup. Some test files may be disorganized as architecture updates are being finalized.
+```
 
 ## GitHub
 
 https://github.com/sarli-s/kung_fu
+

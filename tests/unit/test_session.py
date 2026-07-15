@@ -158,7 +158,8 @@ class TestExecuteMove:
         engine = GameEngine(board)
         engine.request_move(0, 0, 0, 2)
         engine.advance(2000)
-        assert engine.cell(0, 0) == "wR"
+        assert engine.cell(0, 0) == "."
+        assert engine.cell(0, 1) == "wR"
         assert engine.cell(0, 2) == "wK"
 
     def test_execute_move_blocked_by_piece(self):
