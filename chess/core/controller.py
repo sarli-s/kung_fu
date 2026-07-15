@@ -2,9 +2,11 @@ from chess.view.board_printer import print_board
 from chess.config import ChessConfig
 
 
-def _pixel_to_cell(engine, x, y, config=None):
+def _pixel_to_cell(engine, x, y, config=None, border_x=0, border_y=0):
     cell_size = (config or ChessConfig).cell_size
-    col, row = x // cell_size, y // cell_size
+    x_adjusted = x - border_x
+    y_adjusted = y - border_y
+    col, row = x_adjusted // cell_size, y_adjusted // cell_size
     if 0 <= row < engine.rows() and 0 <= col < engine.cols():
         return row, col
     return None
@@ -69,10 +71,12 @@ COMMAND_HANDLERS = {
 }
 
 
-def handle_commands(engine, commands, handlers=COMMAND_HANDLERS):
-    ctx = {"selected": None, "game_over": False}
-    engine.subscribe("on_game_over", lambda **_: ctx.update({"game_over": True}))
+def handle_commands(engine, commands, handlers=COMMAND_HANDLERS, ctx=None):
+    if ctx is None:
+        ctx = {"selected": None, "game_over": False}
+        engine.subscribe("on_game_over", lambda **_: ctx.update({"game_over": True}))
     for cmd in commands:
         key = next((k for k in handlers if cmd == k or cmd.startswith(k + " ")), None)
         if key:
             handlers[key](engine, cmd, ctx)
+    return ctx

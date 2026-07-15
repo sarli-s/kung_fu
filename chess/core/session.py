@@ -52,6 +52,16 @@ class GameEngine(EventEmitter):
     def is_airborne(self, row, col):
         return self._clock.is_airborne(row, col)
 
+    def is_short_rest(self, row, col):
+        return False  # TODO: implement when clock tracks rest state
+
+    def get_move_command(self, row, col):
+        """Get the move command for a piece at (row, col), or None if not moving."""
+        for cmd in self._clock._pending:
+            if cmd.from_row == row and cmd.from_col == col:
+                return cmd
+        return None
+
     # ── Requests ───────────────────────────────────────────────────────────────
 
     def request_jump(self, row, col):
@@ -67,6 +77,10 @@ class GameEngine(EventEmitter):
         token = self._board.get_raw(from_row, from_col)
         if token == self._fmt.empty():
             return
+        # Check if another piece is moving to our starting position
+        for other_cmd in self._clock._pending:
+            if other_cmd.to_row == from_row and other_cmd.to_col == from_col:
+                return
         piece = self._piece_factory(self._fmt.decode(token))
         if not piece:
             return
