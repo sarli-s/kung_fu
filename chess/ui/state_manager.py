@@ -9,7 +9,9 @@ class StateManager:
             return PIECE_STATE_MAP["airborne"]
         elif engine.is_moving(row, col):
             return PIECE_STATE_MAP["moving"]
-        # elif engine.is_short_rest(row, col):
-        #     return PIECE_STATE_MAP["short_rest"]
+        elif engine.is_short_rest(row, col):
+            return PIECE_STATE_MAP["short_rest"]
+        elif engine.is_long_rest(row, col):
+            return PIECE_STATE_MAP["long_rest"]
         else:
             return PIECE_STATE_MAP["idle"]

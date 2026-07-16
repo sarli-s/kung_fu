@@ -174,31 +174,31 @@ class TestExecuteMove:
         board = Board([[".", ".", "bK"], [".", ".", "."], [".", ".", "."], [".", ".", "."], [".", ".", "."], [".", ".", "."], [".", ".", "."], ["wP", ".", "."]])
         engine = GameEngine(board)
         engine.request_move(7, 0, 6, 0)
-        engine.advance(1000)
+        engine.advance(2000)
         assert engine.cell(6, 0) == "wP"
         assert engine.cell(7, 0) == "."
         engine.request_move(6, 0, 5, 0)
-        engine.advance(1000)
+        engine.advance(2000)
         assert engine.cell(5, 0) == "wP"
         assert engine.cell(6, 0) == "."
         engine.request_move(5, 0, 4, 0)
-        engine.advance(1000)
+        engine.advance(2000)
         assert engine.cell(4, 0) == "wP"
         assert engine.cell(5, 0) == "."
         engine.request_move(4, 0, 3, 0)
-        engine.advance(1000)
+        engine.advance(2000)
         assert engine.cell(3, 0) == "wP"
         assert engine.cell(4, 0) == "."
         engine.request_move(3, 0, 2, 0)
-        engine.advance(1000)
+        engine.advance(2000)
         assert engine.cell(2, 0) == "wP"
         assert engine.cell(3, 0) == "."
         engine.request_move(2, 0, 1, 0)
-        engine.advance(1000)
+        engine.advance(2000)
         assert engine.cell(1, 0) == "wP"
         assert engine.cell(2, 0) == "."
         engine.request_move(1, 0, 0, 0)
-        engine.advance(1000)
+        engine.advance(2000)
         assert engine.cell(0, 0) == "wQ"
         assert engine.cell(1, 0) == "."
 
@@ -220,19 +220,19 @@ class TestEvents:
         promoted = []
         engine.subscribe("on_promotion", lambda **kwargs: promoted.append(kwargs))
         engine.request_move(7, 0, 6, 0)
-        engine.advance(1000)
+        engine.advance(3000)  # 1000ms move + 2000ms rest
         engine.request_move(6, 0, 5, 0)
-        engine.advance(1000)
+        engine.advance(3000)
         engine.request_move(5, 0, 4, 0)
-        engine.advance(1000)
+        engine.advance(3000)
         engine.request_move(4, 0, 3, 0)
-        engine.advance(1000)
+        engine.advance(3000)
         engine.request_move(3, 0, 2, 0)
-        engine.advance(1000)
+        engine.advance(3000)
         engine.request_move(2, 0, 1, 0)
-        engine.advance(1000)
+        engine.advance(3000)
         engine.request_move(1, 0, 0, 0)
-        engine.advance(1000)
+        engine.advance(3000)
         assert len(promoted) == 1
         assert promoted[0]["piece"] == "wQ"
 

@@ -4,6 +4,7 @@ from chess.ui.config import BOARD_ROWS, BOARD_COLS, CELL_SIZE, BOARD_BORDER_X, B
 from chess.ui.assets import AssetLoader
 from chess.ui.animator import Animator
 from chess.ui.state_manager import StateManager
+from chess.ui.img import Img
 
 
 class BoardRenderer:
@@ -66,8 +67,8 @@ class BoardRenderer:
 
     def render(self, engine, selected_cell=None, delta_ms=0):
         """Render current engine state to canvas. Returns numpy array (BGR/BGRA)."""
-        # Copy background
         canvas = self.board_bg.copy()
+        canvas_img = Img(canvas)
 
         # Draw selection square if selected
         if selected_cell is not None:
@@ -76,10 +77,7 @@ class BoardRenderer:
             y = row * CELL_SIZE + BOARD_BORDER_Y
             square_img = self.asset_loader.get_square_image()
             if square_img is not None:
-                h, w = square_img.shape[:2]
-                offset_x = (CELL_SIZE - w) // 2
-                offset_y = (CELL_SIZE - h) // 2
-                self._blend_sprite_at_pixel(canvas, square_img, x + offset_x, y + offset_y)
+                Img(square_img).draw_on(canvas_img, x, y, exact_pixel=True)
 
         # Draw each piece
         for row in range(BOARD_ROWS):
@@ -102,65 +100,7 @@ class BoardRenderer:
                 y = smooth_row * CELL_SIZE
 
                 # Blend sprite onto canvas
-                self._blend_sprite(canvas, sprite, x, y)
+                Img(sprite).draw_on(canvas_img, x, y, exact_pixel=False, cell_size=CELL_SIZE, board_border_x=BOARD_BORDER_X, board_border_y=BOARD_BORDER_Y)
 
-        return canvas
+        return canvas_img.img
 
-    def _blend_sprite_at_pixel(self, canvas, sprite, x_pos, y_pos):
-        """Blend sprite at exact pixel position."""
-        h, w = sprite.shape[:2]
-        x_pos, y_pos = int(x_pos), int(y_pos)
-        
-        # Ensure sprite fits
-        if y_pos + h > canvas.shape[0] or x_pos + w > canvas.shape[1]:
-            return
-
-        roi = canvas[y_pos:y_pos + h, x_pos:x_pos + w]
-
-        # Ensure channel compatibility
-        sprite_to_blend = sprite
-        if sprite.shape[2] != canvas.shape[2]:
-            if sprite.shape[2] == 3 and canvas.shape[2] == 4:
-                sprite_to_blend = cv2.cvtColor(sprite, cv2.COLOR_BGR2BGRA)
-            elif sprite.shape[2] == 4 and canvas.shape[2] == 3:
-                sprite_to_blend = cv2.cvtColor(sprite, cv2.COLOR_BGRA2BGR)
-
-        if sprite_to_blend.shape[2] == 4:  # BGRA
-            b, g, r, a = cv2.split(sprite_to_blend)
-            mask = a / 255.0
-            for c in range(3):
-                roi[..., c] = (1 - mask) * roi[..., c] + mask * sprite_to_blend[..., c]
-        else:  # BGR
-            canvas[y_pos:y_pos + h, x_pos:x_pos + w] = sprite_to_blend
-
-    def _blend_sprite(self, canvas, sprite, x, y):
-        """Blend sprite with alpha channel onto canvas at (x, y), centered in cell."""
-        h, w = sprite.shape[:2]
-        
-        # Center sprite in cell
-        offset_x = (CELL_SIZE - w) // 2
-        offset_y = (CELL_SIZE - h) // 2
-        x_pos = int(x + offset_x + BOARD_BORDER_X)
-        y_pos = int(y + offset_y + BOARD_BORDER_Y)
-
-        # Ensure sprite fits
-        if y_pos + h > canvas.shape[0] or x_pos + w > canvas.shape[1]:
-            return
-
-        roi = canvas[y_pos:y_pos + h, x_pos:x_pos + w]
-
-        # Ensure channel compatibility
-        sprite_to_blend = sprite
-        if sprite.shape[2] != canvas.shape[2]:
-            if sprite.shape[2] == 3 and canvas.shape[2] == 4:
-                sprite_to_blend = cv2.cvtColor(sprite, cv2.COLOR_BGR2BGRA)
-            elif sprite.shape[2] == 4 and canvas.shape[2] == 3:
-                sprite_to_blend = cv2.cvtColor(sprite, cv2.COLOR_BGRA2BGR)
-
-        if sprite_to_blend.shape[2] == 4:  # BGRA
-            b, g, r, a = cv2.split(sprite_to_blend)
-            mask = a / 255.0
-            for c in range(3):
-                roi[..., c] = (1 - mask) * roi[..., c] + mask * sprite_to_blend[..., c]
-        else:  # BGR
-            canvas[y_pos:y_pos + h, x_pos:x_pos + w] = sprite_to_blend

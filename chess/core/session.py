@@ -53,7 +53,10 @@ class GameEngine(EventEmitter):
         return self._clock.is_airborne(row, col)
 
     def is_short_rest(self, row, col):
-        return False  # TODO: implement when clock tracks rest state
+        return self._clock.is_short_rest(row, col)
+
+    def is_long_rest(self, row, col):
+        return self._clock.is_long_rest(row, col)
 
     def get_move_command(self, row, col):
         """Get the move command for a piece at (row, col), or None if not moving."""
@@ -73,6 +76,8 @@ class GameEngine(EventEmitter):
 
     def request_move(self, from_row, from_col, to_row, to_col):
         if self._clock.is_moving(from_row, from_col):
+            return
+        if self._clock.is_short_rest(from_row, from_col) or self._clock.is_long_rest(from_row, from_col):
             return
         token = self._board.get_raw(from_row, from_col)
         if token == self._fmt.empty():
@@ -101,7 +106,10 @@ class GameEngine(EventEmitter):
     # ── Advance ────────────────────────────────────────────────────────────────
 
     def advance(self, ms):
+        expired_jumps = [j for j in self._clock._airborne if j.remaining <= ms]
         self._clock.advance(ms, self._resolve_checkpoint)
+        for j in expired_jumps:
+            self._clock.add_short_rest(j.row, j.col, self._config.rest_after_jump)
 
     def _resolve_checkpoint(self, cmd, r, c):
         """Called for each due checkpoint (r, c). Returns True when the move is finished."""
@@ -171,6 +179,7 @@ class GameEngine(EventEmitter):
         if promoted:
             self.emit("on_promotion", piece=fmt.decode(arrival), row=to_row, col=to_col)
         self._board.set_raw(to_row, to_col, arrival)
+        self._clock.add_long_rest(to_row, to_col, self._config.rest_after_move)
 
     def _captured_by_airborne(self, cmd, token):
         airborne_cmd = self._clock.get_airborne_at(cmd.to_row, cmd.to_col)

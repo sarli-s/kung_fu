@@ -276,6 +276,6 @@ class TestPawnSpecialRules:
     def test_promoted_queen_can_move_diagonally(self):
         assert _run(
             [". . .", ". wP .", ". . ."],
-            ["click 150 150", "click 150 50", "wait 1000",
+            ["click 150 150", "click 150 50", "wait 2000",
              "click 150 50", "click 250 150", "wait 1000", "print board"]
         ) == ". . .\n. . wQ\n. . ."

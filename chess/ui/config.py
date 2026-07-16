@@ -7,8 +7,8 @@ PIECES_DIR = ASSETS_ROOT / "pieces3"
 SQUARE_IMAGE = ASSETS_ROOT / "square.jpg"
 
 # Board dimensions
-BOARD_SIZE = 800  # pixels
-CELL_SIZE = 102   # pixels (800 / 8)
+BOARD_SIZE = 808  # pixels
+CELL_SIZE = 102   # pixels (808 / 8)
 BOARD_ROWS = 8
 BOARD_COLS = 8
 
@@ -24,5 +24,6 @@ PIECE_STATE_MAP = {
     "airborne": "jump",
     "moving": "move",
     "short_rest": "short_rest",
+    "long_rest": "long_rest",
     "idle": "idle",
 }

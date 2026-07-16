@@ -22,6 +22,9 @@ class DisplayLoop:
                 self.ctx["hover"] = None
         
         elif event == cv2.EVENT_LBUTTONDOWN:
+            if self.engine.game_over:
+                return
+            
             cell = _pixel_to_cell(self.engine, x, y, border_x=BOARD_BORDER_X, border_y=BOARD_BORDER_Y)
             if cell is None:
                 return

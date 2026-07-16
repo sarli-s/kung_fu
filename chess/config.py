@@ -17,12 +17,18 @@ VALID_TOKENS = {
 }
 
 
+REST_AFTER_MOVE = 2000
+REST_AFTER_JUMP = 1000
+
+
 @dataclass
 class GameConfig:
     move_time_per_cell: int = MOVE_TIME_PER_CELL
     jump_duration: int = JUMP_DURATION
     cell_size: int = CELL_SIZE
     valid_tokens: set = field(default_factory=lambda: set(VALID_TOKENS))
+    rest_after_move: int = REST_AFTER_MOVE
+    rest_after_jump: int = REST_AFTER_JUMP
 
 
 ChessConfig = GameConfig()
