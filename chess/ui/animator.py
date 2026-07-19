@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from chess.ui.config import PIECES_DIR
+from chess.ui.errors import AnimationError
 
 
 class Animator:
@@ -23,8 +24,8 @@ class Animator:
                 config = json.load(f)
             self._state_configs[cache_key] = config
             return config
-        except:
-            return None
+        except (IOError, json.JSONDecodeError) as e:
+            raise AnimationError(f"Failed to load animation config for {token}/{state}: {e}")
 
     def _count_sprite_frames(self, token, state):
         """Count how many sprite frames exist for a state."""

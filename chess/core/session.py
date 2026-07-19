@@ -176,12 +176,13 @@ class GameEngine(EventEmitter):
         dest_text = fmt.decode(dest)
         self._board.set_raw(cmd.from_row, cmd.from_col, empty)
         self.emit("on_move", piece=fmt.decode(token), from_row=cmd.from_row, from_col=cmd.from_col, to_row=to_row, to_col=to_col)
-        if dest != empty and self._rules.is_royal(dest, fmt):
+        king_captured = dest != empty and self._rules.is_royal(dest, fmt)
+        if king_captured:
             self.game_over = True
             self.emit("on_game_over", winner=fmt.color(token))
         elif dest != empty:
             self.emit("on_capture", captured=dest_text, by=fmt.decode(token), row=to_row, col=to_col)
-        promoted = self._rules.get_promotion(token, to_row, self._board, fmt)
+        promoted = None if king_captured else self._rules.get_promotion(token, to_row, self._board, fmt)
         arrival = promoted or token
         if promoted:
             self.emit("on_promotion", piece=fmt.decode(arrival), row=to_row, col=to_col)

@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from chess.ui.errors import ImageError
 
 
 class Img:
@@ -9,7 +10,7 @@ class Img:
     def put_text(self, txt, x, y, font_size, color=(255, 255, 255), thickness=2):
         """Draw text on the image at position (x, y)."""
         if self.img is None:
-            raise ValueError("Image not loaded.")
+            raise ImageError("Image not loaded.")
         cv2.putText(self.img, txt, (x, y),
                     cv2.FONT_HERSHEY_SIMPLEX, font_size,
                     color, thickness, cv2.LINE_AA)
@@ -18,7 +19,7 @@ class Img:
     def draw_rectangle(self, x, y, width, height, color=(0, 255, 0), thickness=3):
         """Draw a rectangle border on the image."""
         if self.img is None:
-            raise ValueError("Image not loaded.")
+            raise ImageError("Image not loaded.")
         cv2.rectangle(self.img, (x, y), (x + width, y + height), color, thickness)
         return self
 
@@ -35,7 +36,7 @@ class Img:
             board_border_y: Board border Y offset for centering
         """
         if self.img is None or other_img.img is None:
-            raise ValueError("Both images must be loaded before drawing.")
+            raise ImageError("Both images must be loaded before drawing.")
 
         h, w = self.img.shape[:2]
         H, W = other_img.img.shape[:2]
@@ -45,7 +46,7 @@ class Img:
             x_pos, y_pos = int(x), int(y)
         else:
             if cell_size is None:
-                raise ValueError("cell_size required when exact_pixel=False")
+                raise ImageError("cell_size required when exact_pixel=False")
             offset_x = (cell_size - w) // 2
             offset_y = (cell_size - h) // 2
             x_pos = int(x + offset_x + board_border_x)
@@ -76,6 +77,6 @@ class Img:
     def show(self, window_name="Image"):
         """Display the image in a window."""
         if self.img is None:
-            raise ValueError("Image not loaded.")
+            raise ImageError("Image not loaded.")
         cv2.imshow(window_name, self.img)
         return self

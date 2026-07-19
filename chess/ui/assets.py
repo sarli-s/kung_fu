@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from pathlib import Path
 from chess.ui.config import PIECES_DIR, DEFAULT_PIECE_STATE, DEFAULT_SPRITE_INDEX, CELL_SIZE, SQUARE_IMAGE, BOARD_IMAGE
+from chess.ui.errors import AssetLoadError
 
 
 class AssetLoader:
@@ -11,7 +12,11 @@ class AssetLoader:
         self._board_bg = None
 
     def get_board_background(self):
-        """Load and cache the board background image."""
+        """Load and cache the board background image.
+        
+        Raises AssetLoadError if board fails to load - this is a critical asset
+        required for rendering. Game cannot proceed without it.
+        """
         if self._board_bg is not None:
             return self._board_bg
 
@@ -21,13 +26,17 @@ class AssetLoader:
             img_data = np.frombuffer(f.read(), np.uint8)
         img = cv2.imdecode(img_data, cv2.IMREAD_UNCHANGED)
         if img is None:
-            raise FileNotFoundError(f"Board image not found: {BOARD_IMAGE}")
+            raise AssetLoadError(f"Board image not found or failed to decode: {BOARD_IMAGE}")
         
         self._board_bg = img
         return img
 
     def get_piece_sprite(self, token, state=DEFAULT_PIECE_STATE, sprite_idx=DEFAULT_SPRITE_INDEX):
-        """Load and cache a piece sprite. Returns resized image (max CELL_SIZE, keeping aspect ratio)."""
+        """Load and cache a piece sprite. Returns resized image (max CELL_SIZE, keeping aspect ratio).
+        
+        Returns None if sprite not found - this is non-critical. Rendering continues without
+        the piece rather than crashing, allowing graceful degradation if assets are missing.
+        """
         cache_key = (token, state, sprite_idx)
         if cache_key in self._sprite_cache:
             return self._sprite_cache[cache_key]
