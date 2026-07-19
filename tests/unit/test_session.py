@@ -245,3 +245,50 @@ class TestEvents:
         engine.advance(2000)
         assert len(game_over) == 1
         assert game_over[0]["winner"] == "w"
+
+
+class TestMoveTracker:
+    def test_tracker_records_white_move(self):
+        board = Board([["wR", ".", "."]])
+        engine = GameEngine(board)
+        engine.request_move(0, 0, 0, 2)
+        engine.advance(2000)
+        white_moves = engine.move_tracker.get_moves("white")
+        assert len(white_moves) == 1
+        assert white_moves[0]["piece"] == "wR"
+        assert white_moves[0]["from"] == (0, 0)
+        assert white_moves[0]["to"] == (0, 2)
+
+    def test_tracker_records_black_move(self):
+        board = Board([[".", ".", "."], ["bK", ".", "."]])
+        engine = GameEngine(board)
+        engine.request_move(1, 0, 1, 1)
+        engine.advance(2000)
+        black_moves = engine.move_tracker.get_moves("black")
+        assert len(black_moves) == 1
+        assert black_moves[0]["piece"] == "bK"
+        assert black_moves[0]["from"] == (1, 0)
+        assert black_moves[0]["to"] == (1, 1)
+
+    def test_tracker_records_multiple_moves(self):
+        board = Board([["wR", ".", ".", "."], ["bK", ".", ".", "."]])
+        engine = GameEngine(board)
+        engine.request_move(0, 0, 0, 2)
+        engine.advance(2000)
+        engine.request_move(1, 0, 1, 1)
+        engine.advance(2000)
+        white_moves = engine.move_tracker.get_moves("white")
+        black_moves = engine.move_tracker.get_moves("black")
+        assert len(white_moves) == 1
+        assert len(black_moves) == 1
+        assert white_moves[0]["piece"] == "wR"
+        assert black_moves[0]["piece"] == "bK"
+
+    def test_tracker_has_timestamp(self):
+        board = Board([["wR", ".", "."]])
+        engine = GameEngine(board)
+        engine.request_move(0, 0, 0, 2)
+        engine.advance(2000)
+        white_moves = engine.move_tracker.get_moves("white")
+        assert "timestamp" in white_moves[0]
+        assert isinstance(white_moves[0]["timestamp"], float)

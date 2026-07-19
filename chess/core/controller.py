@@ -6,7 +6,7 @@ def _pixel_to_cell(engine, x, y, config=None, border_x=0, border_y=0):
     cell_size = (config or ChessConfig).cell_size
     x_adjusted = x - border_x
     y_adjusted = y - border_y
-    col, row = x_adjusted // cell_size, y_adjusted // cell_size
+    col, row = int(x_adjusted / cell_size), int(y_adjusted / cell_size)
     if 0 <= row < engine.rows() and 0 <= col < engine.cols():
         return row, col
     return None

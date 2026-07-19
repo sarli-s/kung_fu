@@ -3,6 +3,7 @@ from chess.entities.jump import JumpCommand
 from chess.entities.pieces.factory import PieceFactory
 from chess.rules.engine_rules import ChessBoardRules
 from chess.core.clock import RealTimeArbiter
+from chess.core.move_tracker import MoveTracker
 from chess.utils.event_emitter import EventEmitter
 from chess.config import ChessConfig
 
@@ -18,6 +19,9 @@ class GameEngine(EventEmitter):
         self._clock = RealTimeArbiter(self._config)
         self.game_over = False
         self._pawn_start_rows = self._record_pawn_starts()
+        self.move_tracker = MoveTracker()
+        self.subscribe("on_move", self.move_tracker.on_move)
+        self.subscribe("on_capture", self._on_capture_event)
 
     def _record_pawn_starts(self):
         starts = {}
@@ -29,7 +33,9 @@ class GameEngine(EventEmitter):
                     starts[(r, c)] = r
         return starts
 
-    # ── Public read interface (delegates to board/clock) ───────────────────────
+    def _on_capture_event(self, row, col, by=None, **_):
+        """Called when a capture occurs. Marks the capturing piece's move as a capture."""
+        self.move_tracker.mark_capture(row, col, capturing_piece=by)
 
     def cell(self, row, col):
         return self._board.cell(row, col)
@@ -169,6 +175,7 @@ class GameEngine(EventEmitter):
         dest = self._board.get_raw(to_row, to_col)
         dest_text = fmt.decode(dest)
         self._board.set_raw(cmd.from_row, cmd.from_col, empty)
+        self.emit("on_move", piece=fmt.decode(token), from_row=cmd.from_row, from_col=cmd.from_col, to_row=to_row, to_col=to_col)
         if dest != empty and self._rules.is_royal(dest, fmt):
             self.game_over = True
             self.emit("on_game_over", winner=fmt.color(token))
