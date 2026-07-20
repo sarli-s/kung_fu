@@ -3,6 +3,11 @@ Command protocol and move validation.
 """
 
 
+def coords_to_notation(row, col):
+    """Convert (row, col) board coordinates to chess square notation (e.g. (6,4) -> 'e2')."""
+    return chr(ord('a') + col) + str(8 - row)
+
+
 class MoveValidator:
     """Validates and executes move commands on a GameEngine."""
 

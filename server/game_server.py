@@ -7,8 +7,9 @@ import websockets
 import json
 import logging
 from server.rooms_manager import RoomsManager
-from server.command_parser import MoveValidator, JumpValidator
+from server.command_parser import MoveValidator, JumpValidator, coords_to_notation
 from server.lobby import LobbyManager
+from server.game_bus import GameBus
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,10 @@ class GameServer:
         self.lobby = LobbyManager()
         # websocket -> {"username": str, "color": "w"/"b", "room_id": str}
         self._player_info: dict = {}
+        # room_id -> GameBus
+        self._buses: dict = {}
+        self._resync_every = 60  # ticks (~1 s at 16 ms/tick)
+        self._tick_count = 0
 
     def board_to_json(self, room_id):
         """Convert board state to JSON for a specific room."""
@@ -157,18 +162,69 @@ class GameServer:
             self.last_pong.pop(websocket, None)
             logger.info(f"Client removed. Total clients: {len(self.clients)}")
 
-    async def broadcast_board_state(self):
-        """Broadcast current board state to all connected clients."""
+    def _schedule_broadcast(self, coro):
+        """Schedule a broadcast coroutine as a fire-and-forget task, logging any exception."""
+        def _log_exc(task):
+            exc = task.exception()
+            if exc:
+                logger.error("Broadcast task raised an exception: %s", exc, exc_info=exc)
+        task = asyncio.get_event_loop().create_task(coro)
+        task.add_done_callback(_log_exc)
+
+    async def _send_event(self, event: dict):
+        """Broadcast a small event dict to all connected clients."""
         if not self.clients:
             return
-        
-        room_id = "default"
+        message = json.dumps(event)
+        await asyncio.gather(*[c.send(message) for c in self.clients], return_exceptions=True)
+
+    def _wire_bus(self, room_id):
+        """Create a GameBus for a room and subscribe event-broadcast listeners."""
+        engine = self.rooms_manager.get_room(room_id)
+        bus = GameBus(engine)
+
+        def on_move(**data):
+            self._schedule_broadcast(self._send_event({
+                "type": "move", "room_id": room_id,
+                "from": coords_to_notation(data["from_row"], data["from_col"]),
+                "to":   coords_to_notation(data["to_row"],   data["to_col"]),
+                "piece": data.get("piece"),
+            }))
+
+        def on_capture(**data):
+            self._schedule_broadcast(self._send_event({
+                "type": "capture", "room_id": room_id,
+                "square":   coords_to_notation(data["row"], data["col"]),
+                "captured": data.get("captured"),
+                "by":       data.get("by"),
+            }))
+
+        def on_promotion(**data):
+            self._schedule_broadcast(self._send_event({
+                "type": "promotion", "room_id": room_id,
+                "square": coords_to_notation(data["row"], data["col"]),
+                "piece":  data.get("piece"),
+            }))
+
+        def on_game_over(**data):
+            self._schedule_broadcast(self._send_event({
+                "type": "game_over", "room_id": room_id,
+                "winner": data.get("winner"),
+            }))
+
+        bus.subscribe("on_move",      "server_broadcast", on_move)
+        bus.subscribe("on_capture",   "server_broadcast", on_capture)
+        bus.subscribe("on_promotion", "server_broadcast", on_promotion)
+        bus.subscribe("on_game_over", "server_broadcast", on_game_over)
+        self._buses[room_id] = bus
+
+    async def broadcast_board_state(self, room_id="default"):
+        """Broadcast a full board snapshot to all connected clients (periodic resync)."""
+        if not self.clients:
+            return
         board_json = self.board_to_json(room_id)
         message = json.dumps(board_json)
-        
-        tasks = [client.send(message) for client in self.clients]
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*[c.send(message) for c in self.clients], return_exceptions=True)
 
     async def tick_loop(self):
         """Main game loop: advance all room engines and broadcast state.
@@ -183,6 +239,10 @@ class GameServer:
         next_tick = asyncio.get_event_loop().time() + tick_interval
         last_tick = asyncio.get_event_loop().time()
 
+        # Wire buses once the event loop is running
+        for room_id in self.rooms_manager.rooms:
+            self._wire_bus(room_id)
+
         while True:
             try:
                 now = asyncio.get_event_loop().time()
@@ -192,7 +252,9 @@ class GameServer:
                 for room_id, engine in self.rooms_manager.rooms.items():
                     engine.advance(elapsed_ms)
 
-                await self.broadcast_board_state()
+                self._tick_count += 1
+                if self._tick_count % self._resync_every == 0:
+                    await self.broadcast_board_state()
             except Exception as e:
                 logger.error(f"Error in tick loop: {e}", exc_info=True)
 
