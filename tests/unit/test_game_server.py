@@ -17,13 +17,17 @@ def event_loop():
 
 @pytest.mark.asyncio
 async def test_game_server_sends_initial_board_state():
-    """Client receives initial board state on connection."""
+    """Client receives initial board state after login."""
     server = GameServer(host="localhost", port=8772, tick_rate_ms=50)
     server_task = asyncio.create_task(server.start())
     await asyncio.sleep(0.2)
 
     try:
         async with websockets.connect("ws://localhost:8772") as websocket:
+            await websocket.send(json.dumps({"type": "login", "username": "alice"}))
+            login_resp = json.loads(await websocket.recv())
+            assert login_resp["type"] == "login_ok"
+
             message = await websocket.recv()
             data = json.loads(message)
 
@@ -48,7 +52,9 @@ async def test_game_server_handles_valid_move_command():
 
     try:
         async with websockets.connect("ws://localhost:8773") as websocket:
-            await websocket.recv()
+            await websocket.send(json.dumps({"type": "login", "username": "alice"}))
+            await websocket.recv()  # login_ok
+            await websocket.recv()  # board_state
 
             command = {"type": "move", "data": "e2e4"}
             await websocket.send(json.dumps(command))
@@ -76,7 +82,9 @@ async def test_game_server_rejects_invalid_move_command():
 
     try:
         async with websockets.connect("ws://localhost:8774") as websocket:
-            await websocket.recv()
+            await websocket.send(json.dumps({"type": "login", "username": "alice"}))
+            await websocket.recv()  # login_ok
+            await websocket.recv()  # board_state
 
             command = {"type": "move", "data": "e4e5"}
             await websocket.send(json.dumps(command))
@@ -104,7 +112,9 @@ async def test_game_server_handles_valid_jump_command():
 
     try:
         async with websockets.connect("ws://localhost:8775") as websocket:
-            await websocket.recv()
+            await websocket.send(json.dumps({"type": "login", "username": "alice"}))
+            await websocket.recv()  # login_ok
+            await websocket.recv()  # board_state
 
             command = {"type": "jump", "data": "e2"}
             await websocket.send(json.dumps(command))
@@ -132,7 +142,9 @@ async def test_game_server_rejects_invalid_jump_command():
 
     try:
         async with websockets.connect("ws://localhost:8776") as websocket:
-            await websocket.recv()
+            await websocket.send(json.dumps({"type": "login", "username": "alice"}))
+            await websocket.recv()  # login_ok
+            await websocket.recv()  # board_state
 
             command = {"type": "jump", "data": "e4"}
             await websocket.send(json.dumps(command))
@@ -160,7 +172,9 @@ async def test_game_server_handles_invalid_json():
 
     try:
         async with websockets.connect("ws://localhost:8777") as websocket:
-            await websocket.recv()
+            await websocket.send(json.dumps({"type": "login", "username": "alice"}))
+            await websocket.recv()  # login_ok
+            await websocket.recv()  # board_state
 
             await websocket.send("not valid json")
 
@@ -251,6 +265,8 @@ async def test_heartbeat_sends_ping_to_client():
     await asyncio.sleep(0.2)
     try:
         async with websockets.connect("ws://localhost:8780") as ws:
+            await ws.send(json.dumps({"type": "login", "username": "alice"}))
+            await ws.recv()  # login_ok
             await ws.recv()  # initial board state
             deadline = asyncio.get_event_loop().time() + 0.5
             data = {}
@@ -277,6 +293,8 @@ async def test_heartbeat_updates_last_pong_on_pong_response():
     await asyncio.sleep(0.2)
     try:
         async with websockets.connect("ws://localhost:8781") as ws:
+            await ws.send(json.dumps({"type": "login", "username": "alice"}))
+            await ws.recv()  # login_ok
             await ws.recv()  # initial board state
             client_ws = next(iter(server.clients))
             before = server.last_pong[client_ws]
@@ -302,6 +320,8 @@ async def test_heartbeat_closes_stale_connection():
     await asyncio.sleep(0.2)
     try:
         async with websockets.connect("ws://localhost:8782") as ws:
+            await ws.send(json.dumps({"type": "login", "username": "alice"}))
+            await ws.recv()  # login_ok
             await ws.recv()  # initial board state
             with pytest.raises(websockets.exceptions.ConnectionClosed):
                 for _ in range(20):
@@ -323,6 +343,8 @@ async def test_heartbeat_does_not_close_responsive_client():
     await asyncio.sleep(0.2)
     try:
         async with websockets.connect("ws://localhost:8783") as ws:
+            await ws.send(json.dumps({"type": "login", "username": "alice"}))
+            await ws.recv()  # login_ok
             await ws.recv()  # initial board state
             deadline = asyncio.get_event_loop().time() + 0.5
             # Respond to every ping; reaching the deadline without ConnectionClosed
@@ -333,6 +355,98 @@ async def test_heartbeat_does_not_close_responsive_client():
                 if data["type"] == "ping":
                     await ws.send(json.dumps({"type": "pong"}))
             assert asyncio.get_event_loop().time() >= deadline
+    finally:
+        server_task.cancel()
+        try:
+            await server_task
+        except asyncio.CancelledError:
+            pass
+
+
+@pytest.mark.asyncio
+async def test_login_assigns_white_to_first_player():
+    """First player to login gets color 'w'."""
+    server = GameServer(host="localhost", port=8784, tick_rate_ms=50)
+    server_task = asyncio.create_task(server.start())
+    await asyncio.sleep(0.2)
+    try:
+        async with websockets.connect("ws://localhost:8784") as ws:
+            await ws.send(json.dumps({"type": "login", "username": "alice"}))
+            resp = json.loads(await ws.recv())
+            assert resp["type"] == "login_ok"
+            assert resp["color"] == "w"
+            assert resp["username"] == "alice"
+    finally:
+        server_task.cancel()
+        try:
+            await server_task
+        except asyncio.CancelledError:
+            pass
+
+
+@pytest.mark.asyncio
+async def test_login_assigns_black_to_second_player():
+    """Second player to login gets color 'b'."""
+    server = GameServer(host="localhost", port=8785, tick_rate_ms=50)
+    server_task = asyncio.create_task(server.start())
+    await asyncio.sleep(0.2)
+    try:
+        async with websockets.connect("ws://localhost:8785") as ws1:
+            await ws1.send(json.dumps({"type": "login", "username": "alice"}))
+            await ws1.recv()  # login_ok white
+
+            async with websockets.connect("ws://localhost:8785") as ws2:
+                await ws2.send(json.dumps({"type": "login", "username": "bob"}))
+                resp = json.loads(await ws2.recv())
+                assert resp["type"] == "login_ok"
+                assert resp["color"] == "b"
+    finally:
+        server_task.cancel()
+        try:
+            await server_task
+        except asyncio.CancelledError:
+            pass
+
+
+@pytest.mark.asyncio
+async def test_third_player_rejected():
+    """Third player receives login_error with 'full' reason."""
+    server = GameServer(host="localhost", port=8786, tick_rate_ms=50)
+    server_task = asyncio.create_task(server.start())
+    await asyncio.sleep(0.2)
+    try:
+        async with websockets.connect("ws://localhost:8786") as ws1:
+            await ws1.send(json.dumps({"type": "login", "username": "alice"}))
+            await ws1.recv()
+
+            async with websockets.connect("ws://localhost:8786") as ws2:
+                await ws2.send(json.dumps({"type": "login", "username": "bob"}))
+                await ws2.recv()
+
+                async with websockets.connect("ws://localhost:8786") as ws3:
+                    await ws3.send(json.dumps({"type": "login", "username": "charlie"}))
+                    resp = json.loads(await ws3.recv())
+                    assert resp["type"] == "login_error"
+                    assert "full" in resp["reason"].lower()
+    finally:
+        server_task.cancel()
+        try:
+            await server_task
+        except asyncio.CancelledError:
+            pass
+
+
+@pytest.mark.asyncio
+async def test_login_error_on_missing_username():
+    """Server rejects login with missing username field."""
+    server = GameServer(host="localhost", port=8787, tick_rate_ms=50)
+    server_task = asyncio.create_task(server.start())
+    await asyncio.sleep(0.2)
+    try:
+        async with websockets.connect("ws://localhost:8787") as ws:
+            await ws.send(json.dumps({"type": "login"}))
+            resp = json.loads(await ws.recv())
+            assert resp["type"] == "login_error"
     finally:
         server_task.cancel()
         try:

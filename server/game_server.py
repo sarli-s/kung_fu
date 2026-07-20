@@ -8,6 +8,7 @@ import json
 import logging
 from server.rooms_manager import RoomsManager
 from server.command_parser import MoveValidator, JumpValidator
+from server.lobby import LobbyManager
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,9 @@ class GameServer:
 
         # Initialize rooms manager with default room
         self.rooms_manager = RoomsManager()
+        self.lobby = LobbyManager()
+        # websocket -> {"username": str, "color": "w"/"b", "room_id": str}
+        self._player_info: dict = {}
 
     def board_to_json(self, room_id):
         """Convert board state to JSON for a specific room."""
@@ -80,19 +84,47 @@ class GameServer:
         else:
             return {"type": "error", "success": False, "reason": f"Unknown command type: {cmd_type}"}
 
+    async def _login_handshake(self, websocket, room_id) -> bool:
+        """Wait for a login message, assign color, reply. Returns True on success."""
+        try:
+            raw = await asyncio.wait_for(websocket.recv(), timeout=30)
+            msg = json.loads(raw)
+        except (asyncio.TimeoutError, json.JSONDecodeError):
+            await websocket.send(json.dumps({"type": "login_error", "reason": "Expected login message"}))
+            return False
+
+        if msg.get("type") != "login" or not msg.get("username"):
+            await websocket.send(json.dumps({"type": "login_error", "reason": "Expected login message"}))
+            return False
+
+        username = msg["username"]
+        success, reason, color = self.lobby.join(room_id, websocket, username)
+        if not success:
+            await websocket.send(json.dumps({"type": "login_error", "reason": reason}))
+            return False
+
+        self._player_info[websocket] = {"username": username, "color": color, "room_id": room_id}
+        await websocket.send(json.dumps({"type": "login_ok", "username": username, "color": color}))
+        logger.info(f"Player '{username}' joined room '{room_id}' as {color}")
+        return True
+
     async def handle_client(self, websocket):
         """Handle a single client connection."""
         room_id = "default"
-        
+
         self.clients.add(websocket)
         self.last_pong[websocket] = asyncio.get_event_loop().time()
-        logger.info(f"Client connected to room '{room_id}'. Total clients: {len(self.clients)}")
-        
+        logger.info(f"Client connected. Total clients: {len(self.clients)}")
+
         try:
+            # Login handshake before anything else
+            if not await self._login_handshake(websocket, room_id):
+                return
+
             # Send initial board state
             board_json = self.board_to_json(room_id)
             await websocket.send(json.dumps(board_json))
-            
+
             # Receive and process commands
             async for message in websocket:
                 logger.debug(f"Received from client: {message}")
@@ -119,6 +151,8 @@ class GameServer:
         except websockets.exceptions.ConnectionClosed:
             logger.info("Client disconnected")
         finally:
+            self.lobby.leave(room_id, websocket)
+            self._player_info.pop(websocket, None)
             self.clients.discard(websocket)
             self.last_pong.pop(websocket, None)
             logger.info(f"Client removed. Total clients: {len(self.clients)}")
