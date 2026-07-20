@@ -34,7 +34,6 @@ class GameEngine(EventEmitter):
         return starts
 
     def _on_capture_event(self, row, col, by=None, **_):
-        """Called when a capture occurs. Marks the capturing piece's move as a capture."""
         self.move_tracker.mark_capture(row, col, capturing_piece=by)
 
     def cell(self, row, col):
@@ -65,7 +64,6 @@ class GameEngine(EventEmitter):
         return self._clock.is_long_rest(row, col)
 
     def get_move_command(self, row, col):
-        """Get the move command for a piece at (row, col), or None if not moving."""
         for cmd in self._clock._pending:
             if cmd.from_row == row and cmd.from_col == col:
                 return cmd
@@ -88,7 +86,7 @@ class GameEngine(EventEmitter):
         token = self._board.get_raw(from_row, from_col)
         if token == self._fmt.empty():
             return
-        # Check if another piece is moving to our starting position
+        # Prevents position swaps between two pieces moving simultaneously
         for other_cmd in self._clock._pending:
             if other_cmd.to_row == from_row and other_cmd.to_col == from_col:
                 return
@@ -98,13 +96,12 @@ class GameEngine(EventEmitter):
         start_row = self._pawn_start_rows.get((from_row, from_col))
         self._rules.prepare_piece(token, piece, self._board, self._fmt, from_row=start_row)
         move = MoveCommand(from_row, from_col, to_row, to_col)
-        # dest_empty snapshot at request time for legality only (pawn diagonal)
-        dest_empty = self._board.is_empty(to_row, to_col)
+        dest_empty = self._board.is_empty(to_row, to_col)  # pawn diagonal legality depends on dest occupancy at request time
         if not piece.is_legal_move(move, dest_empty=dest_empty):
             return
         t = self._config.move_time_per_cell
-        path = piece.get_path(move)  # intermediate cells only
-        full_path = path + [(to_row, to_col)]  # checkpoints include target
+        path = piece.get_path(move)
+        full_path = path + [(to_row, to_col)]
         move.from_token = token
         move.checkpoints = [(k * t, r, c) for k, (r, c) in enumerate(full_path, start=1)]
         self._clock.add_move(move)
@@ -118,7 +115,7 @@ class GameEngine(EventEmitter):
             self._clock.add_short_rest(j.row, j.col, self._config.rest_after_jump)
 
     def _resolve_checkpoint(self, cmd, r, c):
-        """Called for each due checkpoint (r, c). Returns True when the move is finished."""
+        """Called for each due checkpoint. Returns True when the move is finished."""
         fmt = self._fmt
         empty = fmt.empty()
         token = cmd.from_token
@@ -129,15 +126,14 @@ class GameEngine(EventEmitter):
 
         if not is_target:
             if occupied:
-                # Check if enemy is moving to our target (head-on collision)
+                # Head-on collision: allow passage so both pieces can reach their targets
                 if self._get_enemy_moving_to_target(cmd, cmd.to_row, cmd.to_col, fmt):
-                    # Allow passage through intermediate cells
                     cmd.current_row, cmd.current_col = r, c
                     return False
                 prev = self._prev_cell(cmd, r, c)
                 self._land(cmd, token, prev[0], prev[1])
                 return True
-            cmd.current_row, cmd.current_col = r, c  # advanced past this cell
+            cmd.current_row, cmd.current_col = r, c
             return False
 
         # target cell
@@ -148,14 +144,13 @@ class GameEngine(EventEmitter):
             self._land(cmd, token, prev[0], prev[1])
             return True
         if (r, c) in inflight and cell_content == empty:
-            # Check if enemy piece is moving to this target
             enemy_cmd = self._get_enemy_moving_to_target(cmd, r, c, fmt)
             if enemy_cmd:
-                # We arrived first, capture the enemy piece
+                # Arrived first — capture the enemy in-flight
                 cmd.current_row, cmd.current_col = r, c
                 self._land(cmd, token, r, c)
                 return True
-            # in-flight piece is logically here — treat as blocked, stop at prev
+            # In-flight piece is logically occupying this cell — treat as blocked
             prev = self._prev_cell(cmd, r, c)
             self._land(cmd, token, prev[0], prev[1])
             return True
@@ -164,7 +159,6 @@ class GameEngine(EventEmitter):
         return True
 
     def _prev_cell(self, cmd, r, c):
-        """Return the path cell just before (r, c), or origin if none."""
         full_path = [p for _, p_r, p_c in cmd.checkpoints for p in [(p_r, p_c)]]
         idx = full_path.index((r, c))
         return full_path[idx - 1] if idx > 0 else (cmd.from_row, cmd.from_col)
@@ -201,7 +195,6 @@ class GameEngine(EventEmitter):
         return False
 
     def _get_enemy_moving_to_target(self, cmd, target_row, target_col, fmt):
-        """Return enemy command moving to this target, or None."""
         for other_cmd in self._clock._pending:
             if other_cmd is cmd:
                 continue

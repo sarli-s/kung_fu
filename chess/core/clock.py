@@ -5,10 +5,10 @@ from chess.entities.move_command import MoveCommand
 class RealTimeArbiter:
     def __init__(self, config):
         self._config = config
-        self._pending = []   # active MoveCommands (board not yet mutated)
+        self._pending = []
         self._airborne = []
-        self._short_rest = {}  # {(row, col): remaining_ms} — after jump
-        self._long_rest = {}   # {(row, col): remaining_ms} — after move
+        self._short_rest = {}  # {(row, col): remaining_ms}
+        self._long_rest = {}   # {(row, col): remaining_ms}
 
     def add_move(self, cmd: MoveCommand):
         self._pending.append(cmd)
@@ -46,8 +46,7 @@ class RealTimeArbiter:
             if not hasattr(cmd, "next_idx"):
                 cmd.next_idx = 0
 
-        # collect only checkpoints that haven't been dispatched yet (next_idx cursor),
-        # so an already-resolved cell is NEVER re-evaluated on a later tick
+        # next_idx cursor prevents already-resolved cells from being re-evaluated on later ticks
         due = []
         for cmd in self._pending:
             while cmd.next_idx < len(cmd.checkpoints) and cmd.checkpoints[cmd.next_idx][0] <= cmd.elapsed:

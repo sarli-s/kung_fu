@@ -8,7 +8,6 @@ class Img:
         self.img = img
 
     def put_text(self, txt, x, y, font_size, color=(255, 255, 255), thickness=2):
-        """Draw text on the image at position (x, y)."""
         if self.img is None:
             raise ImageError("Image not loaded.")
         cv2.putText(self.img, txt, (x, y),
@@ -17,23 +16,15 @@ class Img:
         return self
 
     def draw_rectangle(self, x, y, width, height, color=(0, 255, 0), thickness=3):
-        """Draw a rectangle border on the image."""
         if self.img is None:
             raise ImageError("Image not loaded.")
         cv2.rectangle(self.img, (x, y), (x + width, y + height), color, thickness)
         return self
 
     def draw_on(self, other_img, x, y, exact_pixel=False, cell_size=None, board_border_x=0, board_border_y=0):
-        """Blend this image onto another image at position (x, y).
-        
-        Args:
-            other_img: Target Img object to blend onto
-            x: X coordinate
-            y: Y coordinate
+        """Args:
             exact_pixel: If True, use exact pixel coords. If False, center in cell.
-            cell_size: Cell size for centering (required if exact_pixel=False)
-            board_border_x: Board border X offset for centering
-            board_border_y: Board border Y offset for centering
+            cell_size: Required if exact_pixel=False.
         """
         if self.img is None or other_img.img is None:
             raise ImageError("Both images must be loaded before drawing.")
@@ -75,7 +66,6 @@ class Img:
         return self
 
     def show(self, window_name="Image"):
-        """Display the image in a window."""
         if self.img is None:
             raise ImageError("Image not loaded.")
         cv2.imshow(window_name, self.img)

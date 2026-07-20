@@ -12,10 +12,8 @@ class DisplayLoop:
         self.renderer = renderer
         self.ctx = {"selected": None, "game_over": False, "hover": None}
         self.input_handler = InputHandler(engine, self.ctx)
-        # handle_commands will subscribe to on_game_over
 
     def run(self):
-        """Run the display loop. Press 'q' or ESC to exit."""
         cv2.namedWindow("Kung Fu Chess")
         cv2.setMouseCallback("Kung Fu Chess", self.input_handler.on_mouse_event)
         
@@ -28,27 +26,24 @@ class DisplayLoop:
             
             self.engine.advance(delta_ms)
             
-            # Pass selected cell and delta_ms to renderer for animations
             board_canvas = self.renderer.render(self.engine, selected_cell=self.ctx["selected"], delta_ms=delta_ms)
             board_height = board_canvas.shape[0]
             
             canvas_img = Img(board_canvas)
             
-            # Draw hover highlight (gold border) always if hovering
             if self.ctx["hover"] is not None:
                 row, col = self.ctx["hover"]
                 x = col * CELL_SIZE + BOARD_BORDER_X + MARGINS_LEFT
                 y = row * CELL_SIZE + BOARD_BORDER_Y
-                canvas_img.draw_rectangle(x, y, CELL_SIZE, CELL_SIZE, color=(0, 215, 255), thickness=3)  # Gold
+                canvas_img.draw_rectangle(x, y, CELL_SIZE, CELL_SIZE, color=(0, 215, 255), thickness=3)
             
-            # Overlay game over text if game is over
             if self.engine.game_over:
                 canvas_img.put_text("Game Over", BOARD_SIZE // 4 + MARGINS_LEFT, BOARD_SIZE // 2, 3.0, color=(0, 0, 255), thickness=3)
             
             canvas_img.show("Kung Fu Chess")
             
             key = cv2.waitKey(1)
-            if key == ord('q') or key == 27:  # 'q' or ESC (don't mask with 0xFF to avoid false positives)
+            if key == ord('q') or key == 27:  # 0xFF mask skipped — avoids false positives on some platforms
                 break
         
         cv2.destroyAllWindows()

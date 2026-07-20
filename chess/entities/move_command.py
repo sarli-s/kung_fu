@@ -6,7 +6,7 @@ from chess.entities.move import Move
 class MoveCommand(Move):
     elapsed: int = field(default=0)
     from_token: object = field(default=None)
-    checkpoints: list = field(default_factory=list)  # [(due_time, row, col), ...]
+    checkpoints: list = field(default_factory=list)
     current_row: int = field(default=None)
     current_col: int = field(default=None)
 

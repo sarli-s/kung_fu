@@ -12,16 +12,12 @@ class AssetLoader:
         self._board_bg = None
 
     def get_board_background(self):
-        """Load and cache the board background image.
-        
-        Raises AssetLoadError if board fails to load - this is a critical asset
-        required for rendering. Game cannot proceed without it.
-        """
+        # Raises AssetLoadError — board is critical, game cannot proceed without it
         if self._board_bg is not None:
             return self._board_bg
 
         path_str = str(BOARD_IMAGE)
-        # Use imdecode to handle Unicode paths
+        # imdecode handles Unicode paths that cv2.imread can't
         with open(path_str, 'rb') as f:
             img_data = np.frombuffer(f.read(), np.uint8)
         img = cv2.imdecode(img_data, cv2.IMREAD_UNCHANGED)
@@ -32,11 +28,7 @@ class AssetLoader:
         return img
 
     def get_piece_sprite(self, token, state=DEFAULT_PIECE_STATE, sprite_idx=DEFAULT_SPRITE_INDEX):
-        """Load and cache a piece sprite. Returns resized image (max CELL_SIZE, keeping aspect ratio).
-        
-        Returns None if sprite not found - this is non-critical. Rendering continues without
-        the piece rather than crashing, allowing graceful degradation if assets are missing.
-        """
+        # Returns None if sprite not found — graceful degradation instead of crashing
         cache_key = (token, state, sprite_idx)
         if cache_key in self._sprite_cache:
             return self._sprite_cache[cache_key]
@@ -47,14 +39,12 @@ class AssetLoader:
         if not sprite_path.exists():
             return None
 
-        # Use imdecode to handle Unicode paths
         with open(str(sprite_path), 'rb') as f:
             img_data = np.frombuffer(f.read(), np.uint8)
         img = cv2.imdecode(img_data, cv2.IMREAD_UNCHANGED)
         if img is None:
             return None
 
-        # Resize keeping aspect ratio (fit within CELL_SIZE)
         h, w = img.shape[:2]
         scale = min(CELL_SIZE / w, CELL_SIZE / h)
         new_w, new_h = int(w * scale), int(h * scale)
@@ -64,18 +54,16 @@ class AssetLoader:
         return img
 
     def get_square_image(self):
-        """Load and cache the selection square image."""
         if self._square_image is not None:
             return self._square_image
 
-        # Use imdecode to handle Unicode paths
+        # imdecode handles Unicode paths that cv2.imread can't
         with open(str(SQUARE_IMAGE), 'rb') as f:
             img_data = np.frombuffer(f.read(), np.uint8)
         img = cv2.imdecode(img_data, cv2.IMREAD_UNCHANGED)
         if img is None:
             return None
 
-        # Resize to CELL_SIZE
         img = cv2.resize(img, (CELL_SIZE, CELL_SIZE), interpolation=cv2.INTER_AREA)
         self._square_image = img
         return img
