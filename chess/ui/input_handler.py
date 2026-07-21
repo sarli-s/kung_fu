@@ -27,7 +27,6 @@ class InputHandler:
                 return
             
             if self.ctx["selected"] is not None and self.ctx["selected"] == cell:
-                # Double-click on same cell triggers jump
                 row, col = cell
                 handle_commands(self.engine, [f"jump {x_adjusted} {y}"], handlers=COMMAND_HANDLERS, ctx=self.ctx)
             else:

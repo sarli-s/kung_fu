@@ -2,7 +2,6 @@ from chess.ui.config import PIECE_STATE_MAP
 
 
 def get_piece_state(engine, row, col):
-    """Determine piece state based on engine conditions."""
     if engine.is_airborne(row, col):
         return PIECE_STATE_MAP["airborne"]
     elif engine.is_moving(row, col):

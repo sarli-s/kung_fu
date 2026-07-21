@@ -1,27 +1,23 @@
 import pathlib
 
-# Paths
 ASSETS_ROOT = pathlib.Path(__file__).parent.parent.parent / "assets" / "images"
 BOARD_IMAGE = ASSETS_ROOT / "board.png"
 PIECES_DIR = ASSETS_ROOT / "pieces3"
 SQUARE_IMAGE = ASSETS_ROOT / "square.jpg"
 
-# Board dimensions
-BOARD_SIZE = 808  # pixels
+BOARD_SIZE = 808
 BOARD_ROWS = 8
 BOARD_COLS = BOARD_ROWS
-CELL_SIZE = BOARD_SIZE // BOARD_ROWS   # pixels (808 / 8)
+CELL_SIZE = BOARD_SIZE // BOARD_ROWS
 
-# Piece sprite state (for now, use idle)
 DEFAULT_PIECE_STATE = "idle"
-DEFAULT_SPRITE_INDEX = 0  # first sprite in state folder
+DEFAULT_SPRITE_INDEX = 0
 
 BOARD_BORDER_X = 5
 BOARD_BORDER_Y = 11
 
 MARGINS_LEFT= 150
 
-# Map engine piece states to sprite state names
 PIECE_STATE_MAP = {
     "airborne": "jump",
     "moving": "move",

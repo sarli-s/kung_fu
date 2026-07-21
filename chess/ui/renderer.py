@@ -48,7 +48,7 @@ class BoardRenderer:
 
         board_height = board_canvas.shape[0]
 
-        if board_canvas.shape[2] == 4:  # BGR required for hstack — alpha channel breaks np.hstack
+        if board_canvas.shape[2] == 4:  # np.hstack requires matching channel counts; alpha must be stripped first
             board_canvas = cv2.cvtColor(board_canvas, cv2.COLOR_BGRA2BGR)
 
         white_panel = self.move_history_renderer.render_panel(engine.move_tracker, "white", board_height)

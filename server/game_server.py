@@ -1,21 +1,19 @@
-"""
-Game WebSocket server with command protocol and move validation.
-"""
-
 import asyncio
 import websockets
 import json
 import logging
 from server.rooms_manager import RoomsManager
-from server.command_parser import MoveValidator, JumpValidator, coords_to_notation
+from server.command_parser import MoveValidator, JumpValidator
 from server.lobby import LobbyManager
-from server.game_bus import GameBus
+from server.connection_manager import ConnectionManager
+from server.broadcaster import Broadcaster
+from server.event_wirer import EventWirer
+from server.loop_runner import LoopRunner
 
 logger = logging.getLogger(__name__)
 
 
 class GameServer:
-    """WebSocket server that runs multiple GameEngine instances in rooms."""
 
     def __init__(self, host="localhost", port=8765, tick_rate_ms=16,
                  ping_interval_s=30, ping_timeout_s=60):
@@ -27,30 +25,26 @@ class GameServer:
         self.clients = set()
         self.last_pong: dict = {}
 
-        # Initialize rooms manager with default room
         self.rooms_manager = RoomsManager()
         self.lobby = LobbyManager()
-        # websocket -> {"username": str, "color": "w"/"b", "room_id": str}
         self._player_info: dict = {}
-        # room_id -> GameBus
         self._buses: dict = {}
-        self._resync_every = 60  # ticks (~1 s at 16 ms/tick)
-        self._tick_count = 0
+
+        self._conn   = ConnectionManager(self)
+        self._bcast  = Broadcaster(self)
+        self._wirer  = EventWirer(self)
+        self._loops  = LoopRunner(self)
 
     def board_to_json(self, room_id):
-        """Convert board state to JSON for a specific room."""
         engine = self.rooms_manager.get_room(room_id)
         if not engine:
             return None
-        
         board_data = []
         for row in range(engine.rows()):
             row_data = []
             for col in range(engine.cols()):
-                cell = engine.cell(row, col)
-                row_data.append(cell)
+                row_data.append(engine.cell(row, col))
             board_data.append(row_data)
-        
         return {
             "type": "board_state",
             "room_id": room_id,
@@ -62,248 +56,45 @@ class GameServer:
         engine = self.rooms_manager.get_room(room_id)
         if not engine:
             return {"type": "error", "success": False, "reason": "Room not found"}
-        
+
         cmd_type = command.get("type")
         cmd_data = command.get("data", "")
-        
+
         if cmd_type == "move":
-            validator = MoveValidator(engine)
-            valid, reason = validator.execute_move(cmd_data)
-            return {
-                "type": "move_response",
-                "success": valid,
-                "reason": reason,
-                "notation": cmd_data,
-            }
-        
-        elif cmd_type == "jump":
-            validator = JumpValidator(engine)
-            valid, reason = validator.execute_jump(cmd_data)
-            return {
-                "type": "jump_response",
-                "success": valid,
-                "reason": reason,
-                "notation": cmd_data,
-            }
-        
-        else:
-            return {"type": "error", "success": False, "reason": f"Unknown command type: {cmd_type}"}
+            valid, reason = MoveValidator(engine).execute_move(cmd_data)
+            return {"type": "move_response", "success": valid, "reason": reason, "notation": cmd_data}
 
-    async def _login_handshake(self, websocket, room_id) -> bool:
-        """Wait for a login message, assign color, reply. Returns True on success."""
-        try:
-            raw = await asyncio.wait_for(websocket.recv(), timeout=30)
-            msg = json.loads(raw)
-        except (asyncio.TimeoutError, json.JSONDecodeError):
-            await websocket.send(json.dumps({"type": "login_error", "reason": "Expected login message"}))
-            return False
+        if cmd_type == "jump":
+            valid, reason = JumpValidator(engine).execute_jump(cmd_data)
+            return {"type": "jump_response", "success": valid, "reason": reason, "notation": cmd_data}
 
-        if msg.get("type") != "login" or not msg.get("username"):
-            await websocket.send(json.dumps({"type": "login_error", "reason": "Expected login message"}))
-            return False
+        return {"type": "error", "success": False, "reason": f"Unknown command type: {cmd_type}"}
 
-        username = msg["username"]
-        success, reason, color = self.lobby.join(room_id, websocket, username)
-        if not success:
-            await websocket.send(json.dumps({"type": "login_error", "reason": reason}))
-            return False
-
-        self._player_info[websocket] = {"username": username, "color": color, "room_id": room_id}
-        await websocket.send(json.dumps({"type": "login_ok", "username": username, "color": color}))
-        logger.info(f"Player '{username}' joined room '{room_id}' as {color}")
-        return True
+    # --- public delegates (kept for backward compatibility / monkey-patching) ---
 
     async def handle_client(self, websocket):
-        """Handle a single client connection."""
-        room_id = "default"
-
-        self.clients.add(websocket)
-        self.last_pong[websocket] = asyncio.get_event_loop().time()
-        logger.info(f"Client connected. Total clients: {len(self.clients)}")
-
-        try:
-            # Login handshake before anything else
-            if not await self._login_handshake(websocket, room_id):
-                return
-
-            # Send initial board state
-            board_json = self.board_to_json(room_id)
-            await websocket.send(json.dumps(board_json))
-
-            # Receive and process commands
-            async for message in websocket:
-                logger.debug(f"Received from client: {message}")
-                try:
-                    command = json.loads(message)
-                    if command.get("type") == "pong":
-                        self.last_pong[websocket] = asyncio.get_event_loop().time()
-                        continue
-                    response = self.handle_command(room_id, command)
-                    await websocket.send(json.dumps(response))
-                except json.JSONDecodeError:
-                    await websocket.send(json.dumps({
-                        "type": "error",
-                        "success": False,
-                        "reason": "Invalid JSON"
-                    }))
-                except Exception as e:
-                    logger.error(f"Error handling command: {e}", exc_info=True)
-                    await websocket.send(json.dumps({
-                        "type": "error",
-                        "success": False,
-                        "reason": str(e)
-                    }))
-        except websockets.exceptions.ConnectionClosed:
-            logger.info("Client disconnected")
-        finally:
-            self.lobby.leave(room_id, websocket)
-            self._player_info.pop(websocket, None)
-            self.clients.discard(websocket)
-            self.last_pong.pop(websocket, None)
-            logger.info(f"Client removed. Total clients: {len(self.clients)}")
-
-    def _schedule_broadcast(self, coro):
-        """Schedule a broadcast coroutine as a fire-and-forget task, logging any exception."""
-        def _log_exc(task):
-            exc = task.exception()
-            if exc:
-                logger.error("Broadcast task raised an exception: %s", exc, exc_info=exc)
-        task = asyncio.get_event_loop().create_task(coro)
-        task.add_done_callback(_log_exc)
-
-    async def _send_event(self, event: dict):
-        """Broadcast a small event dict to all connected clients."""
-        if not self.clients:
-            return
-        message = json.dumps(event)
-        await asyncio.gather(*[c.send(message) for c in self.clients], return_exceptions=True)
-
-    def _wire_bus(self, room_id):
-        """Create a GameBus for a room and subscribe event-broadcast listeners."""
-        engine = self.rooms_manager.get_room(room_id)
-        bus = GameBus(engine)
-
-        def on_move(**data):
-            self._schedule_broadcast(self._send_event({
-                "type": "move", "room_id": room_id,
-                "from": coords_to_notation(data["from_row"], data["from_col"]),
-                "to":   coords_to_notation(data["to_row"],   data["to_col"]),
-                "piece": data.get("piece"),
-            }))
-
-        def on_capture(**data):
-            self._schedule_broadcast(self._send_event({
-                "type": "capture", "room_id": room_id,
-                "square":   coords_to_notation(data["row"], data["col"]),
-                "captured": data.get("captured"),
-                "by":       data.get("by"),
-            }))
-
-        def on_promotion(**data):
-            self._schedule_broadcast(self._send_event({
-                "type": "promotion", "room_id": room_id,
-                "square": coords_to_notation(data["row"], data["col"]),
-                "piece":  data.get("piece"),
-            }))
-
-        def on_game_over(**data):
-            self._schedule_broadcast(self._send_event({
-                "type": "game_over", "room_id": room_id,
-                "winner": data.get("winner"),
-            }))
-
-        bus.subscribe("on_move",      "server_broadcast", on_move)
-        bus.subscribe("on_capture",   "server_broadcast", on_capture)
-        bus.subscribe("on_promotion", "server_broadcast", on_promotion)
-        bus.subscribe("on_game_over", "server_broadcast", on_game_over)
-        self._buses[room_id] = bus
+        await self._conn.handle_client(websocket)
 
     async def broadcast_board_state(self, room_id="default"):
-        """Broadcast a full board snapshot to all connected clients (periodic resync)."""
-        if not self.clients:
-            return
-        board_json = self.board_to_json(room_id)
-        message = json.dumps(board_json)
-        await asyncio.gather(*[c.send(message) for c in self.clients], return_exceptions=True)
+        await self._bcast.broadcast_board_state(room_id)
 
     async def tick_loop(self):
-        """Main game loop: advance all room engines and broadcast state.
-
-        Uses a target-timestamp anchor to prevent drift — each tick schedules
-        itself relative to when it *should* have fired, not when it actually did.
-        Passes real elapsed time to engine.advance() so the engine stays in sync
-        with wall time even during catch-up ticks.
-        """
-        logger.info(f"Tick loop started (tick_rate={self.tick_rate_ms}ms)")
-        tick_interval = self.tick_rate_ms / 1000.0
-        next_tick = asyncio.get_event_loop().time() + tick_interval
-        last_tick = asyncio.get_event_loop().time()
-
-        # Wire buses once the event loop is running
-        for room_id in self.rooms_manager.rooms:
-            self._wire_bus(room_id)
-
-        while True:
-            try:
-                now = asyncio.get_event_loop().time()
-                elapsed_ms = (now - last_tick) * 1000.0
-                last_tick = now
-
-                for room_id, engine in self.rooms_manager.rooms.items():
-                    engine.advance(elapsed_ms)
-
-                self._tick_count += 1
-                if self._tick_count % self._resync_every == 0:
-                    await self.broadcast_board_state()
-            except Exception as e:
-                logger.error(f"Error in tick loop: {e}", exc_info=True)
-
-            now = asyncio.get_event_loop().time()
-            delay = max(0.0, next_tick - now)
-            await asyncio.sleep(delay)
-            next_tick += tick_interval
+        await self._loops.tick_loop()
 
     async def heartbeat_loop(self):
-        """Send pings to all clients and close stale connections.
+        await self._loops.heartbeat_loop()
 
-        Uses the same loop.time()-anchored scheduling as tick_loop to prevent drift.
-        A connection is stale if no pong has been received within ping_timeout_s seconds.
-        """
-        logger.info(f"Heartbeat loop started (interval={self.ping_interval_s}s, "
-                    f"timeout={self.ping_timeout_s}s)")
-        loop = asyncio.get_event_loop()
-        next_ping = loop.time() + self.ping_interval_s
-
-        while True:
-            await asyncio.sleep(max(0.0, next_ping - loop.time()))
-            next_ping += self.ping_interval_s
-            now = loop.time()
-
-            stale = [ws for ws, t in list(self.last_pong.items())
-                     if now - t > self.ping_timeout_s]
-            for ws in stale:
-                logger.warning("Closing stale connection (no pong received)")
-                await ws.close()
-
-            if self.clients:
-                ping_msg = json.dumps({"type": "ping"})
-                await asyncio.gather(
-                    *[ws.send(ping_msg) for ws in self.clients],
-                    return_exceptions=True,
-                )
+    # --- startup ---
 
     async def start(self):
-        """Start the WebSocket server and tick loop."""
-        tick_task = asyncio.create_task(self.tick_loop())
+        tick_task      = asyncio.create_task(self.tick_loop())
         heartbeat_task = asyncio.create_task(self.heartbeat_loop())
 
-        # ping_interval=None disables the library's built-in ping — our
-        # heartbeat_loop is the only disconnect detection mechanism.
         async with websockets.serve(self.handle_client, self.host, self.port,
                                     ping_interval=None):
             logger.info(f"Game server started on ws://{self.host}:{self.port}")
             try:
-                await asyncio.Future()  # Run forever
+                await asyncio.Future()
             except asyncio.CancelledError:
                 tick_task.cancel()
                 heartbeat_task.cancel()
@@ -311,7 +102,6 @@ class GameServer:
 
 
 def run_server(host="localhost", port=8765, tick_rate_ms=16):
-    """Convenience function to run the server."""
     logging.basicConfig(level=logging.INFO)
     server = GameServer(host, port, tick_rate_ms)
     asyncio.run(server.start())

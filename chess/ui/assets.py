@@ -7,17 +7,16 @@ from chess.ui.errors import AssetLoadError
 
 class AssetLoader:
     def __init__(self):
-        self._sprite_cache = {}  # {token: sprite_image}
+        self._sprite_cache = {}
         self._square_image = None
         self._board_bg = None
 
     def get_board_background(self):
-        # Raises AssetLoadError — board is critical, game cannot proceed without it
         if self._board_bg is not None:
             return self._board_bg
 
         path_str = str(BOARD_IMAGE)
-        # imdecode handles Unicode paths that cv2.imread can't
+        # cv2.imread silently fails on Unicode paths; open+imdecode is the workaround.
         with open(path_str, 'rb') as f:
             img_data = np.frombuffer(f.read(), np.uint8)
         img = cv2.imdecode(img_data, cv2.IMREAD_UNCHANGED)
@@ -28,7 +27,6 @@ class AssetLoader:
         return img
 
     def get_piece_sprite(self, token, state=DEFAULT_PIECE_STATE, sprite_idx=DEFAULT_SPRITE_INDEX):
-        # Returns None if sprite not found — graceful degradation instead of crashing
         cache_key = (token, state, sprite_idx)
         if cache_key in self._sprite_cache:
             return self._sprite_cache[cache_key]
@@ -57,7 +55,7 @@ class AssetLoader:
         if self._square_image is not None:
             return self._square_image
 
-        # imdecode handles Unicode paths that cv2.imread can't
+        # cv2.imread silently fails on Unicode paths; open+imdecode is the workaround.
         with open(str(SQUARE_IMAGE), 'rb') as f:
             img_data = np.frombuffer(f.read(), np.uint8)
         img = cv2.imdecode(img_data, cv2.IMREAD_UNCHANGED)

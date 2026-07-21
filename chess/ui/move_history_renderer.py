@@ -4,7 +4,6 @@ from chess.ui.config import CELL_SIZE
 
 
 class MoveHistoryRenderer:
-    """Renders move history panels on left and right sides of the board."""
     
     def __init__(self, asset_loader, panel_width=150, row_height=40):
         self.asset_loader = asset_loader
@@ -63,7 +62,6 @@ class MoveHistoryRenderer:
         
         total_height = len(panel_rows) * self.row_height
         if total_height > board_height:
-            # scroll to most recent — avoids overflow beyond board height
             visible_rows = panel_rows[-(board_height // self.row_height):]
         else:
             visible_rows = panel_rows

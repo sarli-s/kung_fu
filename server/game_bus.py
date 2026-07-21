@@ -7,7 +7,6 @@ listeners in try/except prevents a bug in logging/sound/etc from crashing the ga
 
 
 class GameBus:
-    """Subscribes to GameEngine events and broadcasts them to safe listeners."""
 
     def __init__(self, engine):
         self.engine = engine
@@ -20,25 +19,18 @@ class GameBus:
         self.engine.subscribe("on_game_over", self._dispatch_game_over)
 
     def _dispatch_move(self, **data):
-        """Dispatch on_move event to all registered listeners."""
         self._dispatch("on_move", **data)
 
     def _dispatch_capture(self, **data):
-        """Dispatch on_capture event to all registered listeners."""
         self._dispatch("on_capture", **data)
 
     def _dispatch_promotion(self, **data):
-        """Dispatch on_promotion event to all registered listeners."""
         self._dispatch("on_promotion", **data)
 
     def _dispatch_game_over(self, **data):
-        """Dispatch on_game_over event to all registered listeners."""
         self._dispatch("on_game_over", **data)
 
     def _dispatch(self, event_name, **data):
-        """
-        Catches exceptions per-listener so one failing listener doesn't break the chain.
-        """
         if event_name not in self._listeners:
             return
         for listener_name, fn in self._listeners[event_name]:
@@ -48,7 +40,6 @@ class GameBus:
                 print(f"[GameBus] Error in listener '{listener_name}' for event '{event_name}': {e}")
 
     def subscribe(self, event_name, listener_name, fn):
-        """Register a listener for a game event."""
         if event_name not in self._listeners:
             self._listeners[event_name] = []
         self._listeners[event_name].append((listener_name, fn))

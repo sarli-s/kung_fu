@@ -1,12 +1,5 @@
-"""
-Lobby: manages player login and color assignment per room.
-
-Known limitation (stage 3): no persistence — restarting the server wipes all players.
-"""
-
 
 class LobbyManager:
-    """Tracks connected players per room and assigns colors by join order."""
 
     def __init__(self):
         # room_id -> list of {"player_id": ws, "username": str, "color": "w"/"b"}
@@ -17,10 +10,6 @@ class LobbyManager:
             self._rooms[room_id] = []
 
     def join(self, room_id, player_id, username) -> tuple[bool, str, str | None]:
-        """
-        Try to join a room.
-        Returns (success, reason, color) where color is "w"/"b" or None on failure.
-        """
         self._ensure_room(room_id)
         players = self._rooms[room_id]
 
@@ -32,7 +21,6 @@ class LobbyManager:
         return True, "OK", color
 
     def leave(self, room_id, player_id):
-        """Remove a player from a room."""
         if room_id not in self._rooms:
             return
         self._rooms[room_id] = [
@@ -40,7 +28,6 @@ class LobbyManager:
         ]
 
     def get_color(self, room_id, player_id) -> str | None:
-        """Return the color assigned to a player, or None if not found."""
         for p in self._rooms.get(room_id, []):
             if p["player_id"] == player_id:
                 return p["color"]

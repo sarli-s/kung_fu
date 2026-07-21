@@ -22,17 +22,12 @@ class Img:
         return self
 
     def draw_on(self, other_img, x, y, exact_pixel=False, cell_size=None, board_border_x=0, board_border_y=0):
-        """Args:
-            exact_pixel: If True, use exact pixel coords. If False, center in cell.
-            cell_size: Required if exact_pixel=False.
-        """
         if self.img is None or other_img.img is None:
             raise ImageError("Both images must be loaded before drawing.")
 
         h, w = self.img.shape[:2]
         H, W = other_img.img.shape[:2]
         
-        # Calculate final position
         if exact_pixel:
             x_pos, y_pos = int(x), int(y)
         else:
@@ -48,7 +43,6 @@ class Img:
 
         roi = other_img.img[y_pos:y_pos + h, x_pos:x_pos + w]
 
-        # Ensure channel compatibility
         sprite_to_blend = self.img
         if self.img.shape[2] != other_img.img.shape[2]:
             if self.img.shape[2] == 3 and other_img.img.shape[2] == 4:
@@ -56,12 +50,12 @@ class Img:
             elif self.img.shape[2] == 4 and other_img.img.shape[2] == 3:
                 sprite_to_blend = cv2.cvtColor(self.img, cv2.COLOR_BGRA2BGR)
 
-        if sprite_to_blend.shape[2] == 4:  # BGRA with alpha
+        if sprite_to_blend.shape[2] == 4:
             b, g, r, a = cv2.split(sprite_to_blend)
             mask = a / 255.0
             for c in range(3):
                 roi[..., c] = (1 - mask) * roi[..., c] + mask * sprite_to_blend[..., c]
-        else:  # BGR
+        else:
             other_img.img[y_pos:y_pos + h, x_pos:x_pos + w] = sprite_to_blend
         return self
 

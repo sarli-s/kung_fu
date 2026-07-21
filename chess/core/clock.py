@@ -46,7 +46,6 @@ class RealTimeArbiter:
             if not hasattr(cmd, "next_idx"):
                 cmd.next_idx = 0
 
-        # next_idx cursor prevents already-resolved cells from being re-evaluated on later ticks
         due = []
         for cmd in self._pending:
             while cmd.next_idx < len(cmd.checkpoints) and cmd.checkpoints[cmd.next_idx][0] <= cmd.elapsed:

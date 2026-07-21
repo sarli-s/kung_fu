@@ -96,7 +96,7 @@ class GameEngine(EventEmitter):
         start_row = self._pawn_start_rows.get((from_row, from_col))
         self._rules.prepare_piece(token, piece, self._board, self._fmt, from_row=start_row)
         move = MoveCommand(from_row, from_col, to_row, to_col)
-        dest_empty = self._board.is_empty(to_row, to_col)  # pawn diagonal legality depends on dest occupancy at request time
+        dest_empty = self._board.is_empty(to_row, to_col)  # pawn diagonal capture legality is fixed at request time, not at arrival
         if not piece.is_legal_move(move, dest_empty=dest_empty):
             return
         t = self._config.move_time_per_cell
@@ -115,7 +115,6 @@ class GameEngine(EventEmitter):
             self._clock.add_short_rest(j.row, j.col, self._config.rest_after_jump)
 
     def _resolve_checkpoint(self, cmd, r, c):
-        """Called for each due checkpoint. Returns True when the move is finished."""
         fmt = self._fmt
         empty = fmt.empty()
         token = cmd.from_token
@@ -126,7 +125,7 @@ class GameEngine(EventEmitter):
 
         if not is_target:
             if occupied:
-                # Head-on collision: allow passage so both pieces can reach their targets
+                # Head-on collision: let both pieces pass so neither is unfairly blocked mid-path.
                 if self._get_enemy_moving_to_target(cmd, cmd.to_row, cmd.to_col, fmt):
                     cmd.current_row, cmd.current_col = r, c
                     return False
@@ -146,11 +145,11 @@ class GameEngine(EventEmitter):
         if (r, c) in inflight and cell_content == empty:
             enemy_cmd = self._get_enemy_moving_to_target(cmd, r, c, fmt)
             if enemy_cmd:
-                # Arrived first — capture the enemy in-flight
+                # First arrival wins the contested cell — captures the in-flight enemy.
                 cmd.current_row, cmd.current_col = r, c
                 self._land(cmd, token, r, c)
                 return True
-            # In-flight piece is logically occupying this cell — treat as blocked
+            # The cell is logically reserved by an in-flight friendly — landing here would cause overlap.
             prev = self._prev_cell(cmd, r, c)
             self._land(cmd, token, prev[0], prev[1])
             return True

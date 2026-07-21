@@ -6,8 +6,8 @@ from chess.ui.errors import AnimationError
 
 class Animator:
     def __init__(self):
-        self._animation_state = {}  # {(row, col, token, state): {"elapsed_ms": int, "frame_idx": int}}
-        self._state_configs = {}  # {(token, state): config_dict}
+        self._animation_state = {}
+        self._state_configs = {}
 
     def _load_state_config(self, token, state):
         cache_key = (token, state)

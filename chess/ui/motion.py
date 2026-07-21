@@ -6,12 +6,10 @@ def get_smooth_position(engine, row, col):
     from_row, from_col = cmd.from_row, cmd.from_col
     to_row, to_col = cmd.current_row, cmd.current_col
     
-    # Find progress between checkpoints
     checkpoints = cmd.checkpoints
     if not checkpoints:
         return (to_row, to_col)
     
-    # Walk checkpoints to find which segment we're currently in
     prev_checkpoint = None
     next_checkpoint = None
     for i, (due_time, r, c) in enumerate(checkpoints):

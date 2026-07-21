@@ -43,7 +43,7 @@ class DisplayLoop:
             canvas_img.show("Kung Fu Chess")
             
             key = cv2.waitKey(1)
-            if key == ord('q') or key == 27:  # 0xFF mask skipped — avoids false positives on some platforms
+            if key == ord('q') or key == 27:  # 0xFF mask omitted — it causes false positives on some Linux/macOS backends
                 break
         
         cv2.destroyAllWindows()

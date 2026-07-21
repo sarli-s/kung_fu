@@ -2,7 +2,6 @@ import time
 
 
 class MoveTracker:
-    """Observer that tracks all moves made by each player."""
     
     def __init__(self):
         self.moves = {"white": [], "black": []}
@@ -16,11 +15,10 @@ class MoveTracker:
         return f"{col_letter}{row_number}"
     
     def on_move(self, piece, from_row, from_col, to_row, to_col, **_):
-        # Skip blocked moves where the piece didn't actually change position
         if from_row == to_row and from_col == to_col:
             return
         
-        color = piece[0]  # 'w' or 'b'
+        color = piece[0]
         player = "white" if color == "w" else "black"
         
         move_num = len(self.moves[player]) + 1
@@ -47,7 +45,7 @@ class MoveTracker:
         capturing_player = "white" if capturing_color == "w" else "black"
         capturing_moves = self.moves[capturing_player]
         
-        # Match by destination to handle multiple pieces of the same type moving to the same square
+        # Reversed search because multiple pieces of the same type can share a destination; most recent is most likely correct.
         for move in reversed(capturing_moves):
             if move["to"] == (to_row, to_col):
                 move["is_capture"] = True
