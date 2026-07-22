@@ -9,6 +9,10 @@ from server.connection_manager import ConnectionManager
 from server.broadcaster import Broadcaster
 from server.event_wirer import EventWirer
 from server.loop_runner import LoopRunner
+from server.messages import (
+    BoardStateMessage, PieceStateSimple, PieceStateMoving,
+    MoveResponseMessage, JumpResponseMessage, ErrorMessage, to_json_dict
+)
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +20,11 @@ logger = logging.getLogger(__name__)
 class GameServer:
 
     def __init__(self, host="localhost", port=8765, tick_rate_ms=16,
-                 ping_interval_s=30, ping_timeout_s=60):
+                 broadcast_interval_ms=60, ping_interval_s=30, ping_timeout_s=60):
         self.host = host
         self.port = port
         self.tick_rate_ms = tick_rate_ms
+        self.broadcast_interval_ms = broadcast_interval_ms
         self.ping_interval_s = ping_interval_s
         self.ping_timeout_s = ping_timeout_s
         self.clients = set()
@@ -39,62 +44,66 @@ class GameServer:
         engine = self.rooms_manager.get_room(room_id)
         if not engine:
             return None
-        board_data = []
-        for row in range(engine.rows()):
-            row_data = []
-            for col in range(engine.cols()):
-                row_data.append(engine.cell(row, col))
-            board_data.append(row_data)
+        board = tuple(
+            tuple(engine.cell(row, col) for col in range(engine.cols()))
+            for row in range(engine.rows())
+        )
         states = {}
         for row in range(engine.rows()):
             for col in range(engine.cols()):
+                key = f"{row},{col}"
                 if engine.is_airborne(row, col):
-                    states[f"{row},{col}"] = {"state": "airborne"}
+                    states[key] = to_json_dict(PieceStateSimple(state="airborne"))
                 elif engine.is_moving(row, col):
                     cmd = engine.get_move_command(row, col)
-                    states[f"{row},{col}"] = {
-                        "state": "moving",
-                        "from_row": cmd.from_row, "from_col": cmd.from_col,
-                        "to_row": cmd.to_row, "to_col": cmd.to_col,
-                        "elapsed": cmd.elapsed,
-                        "checkpoints": cmd.checkpoints,
-                    }
+                    states[key] = to_json_dict(PieceStateMoving(
+                        state="moving",
+                        from_row=cmd.from_row, from_col=cmd.from_col,
+                        to_row=cmd.to_row, to_col=cmd.to_col,
+                        elapsed=cmd.elapsed,
+                        checkpoints=tuple(tuple(cp) for cp in cmd.checkpoints),
+                    ))
                 elif engine.is_short_rest(row, col):
-                    states[f"{row},{col}"] = {"state": "short_rest"}
+                    states[key] = to_json_dict(PieceStateSimple(state="short_rest"))
                 elif engine.is_long_rest(row, col):
-                    states[f"{row},{col}"] = {"state": "long_rest"}
+                    states[key] = to_json_dict(PieceStateSimple(state="long_rest"))
         players = {p["color"]: p["username"] for p in self.lobby._rooms.get(room_id, [])}
-        return {
-            "type": "board_state",
-            "room_id": room_id,
-            "board": board_data,
-            "states": states,
-            "moves": {
-                "white": engine.move_tracker.moves["white"],
-                "black": engine.move_tracker.moves["black"],
+        msg = BoardStateMessage(
+            type="board_state",
+            room_id=room_id,
+            board=board,
+            states=states,
+            moves={
+                "white": engine.move_tracker.get_moves("white"),
+                "black": engine.move_tracker.get_moves("black"),
             },
-            "players": players,
-            "game_over": engine.game_over,
-        }
+            players=players,
+            game_over=engine.game_over,
+        )
+        return to_json_dict(msg)
 
     def handle_command(self, room_id, command, player_id=None):
         engine = self.rooms_manager.get_room(room_id)
         if not engine:
-            return {"type": "error", "success": False, "reason": "Room not found"}
+            return to_json_dict(ErrorMessage(type="error", success=False, reason="Room not found"))
 
         cmd_type = command.get("type")
         cmd_data = command.get("data", "")
         player_color = self.lobby.get_color(room_id, player_id) if player_id else None
 
-        if cmd_type == "move":
+        def handle_move():
             valid, reason = MoveValidator(engine).execute_move(cmd_data, player_color=player_color)
-            return {"type": "move_response", "success": valid, "reason": reason, "notation": cmd_data}
+            return to_json_dict(MoveResponseMessage(type="move_response", success=valid, reason=reason, notation=cmd_data))
 
-        if cmd_type == "jump":
+        def handle_jump():
             valid, reason = JumpValidator(engine).execute_jump(cmd_data)
-            return {"type": "jump_response", "success": valid, "reason": reason, "notation": cmd_data}
+            return to_json_dict(JumpResponseMessage(type="jump_response", success=valid, reason=reason, notation=cmd_data))
 
-        return {"type": "error", "success": False, "reason": f"Unknown command type: {cmd_type}"}
+        handlers = {"move": handle_move, "jump": handle_jump}
+        if cmd_type in handlers:
+            return handlers[cmd_type]()
+
+        return to_json_dict(ErrorMessage(type="error", success=False, reason=f"Unknown command type: {cmd_type}"))
 
     # --- public delegates (kept for backward compatibility / monkey-patching) ---
 
@@ -107,6 +116,9 @@ class GameServer:
     async def tick_loop(self):
         await self._loops.tick_loop()
 
+    async def broadcast_loop(self):
+        await self._loops.broadcast_loop()
+
     async def heartbeat_loop(self):
         await self._loops.heartbeat_loop()
 
@@ -114,6 +126,7 @@ class GameServer:
 
     async def start(self):
         tick_task      = asyncio.create_task(self.tick_loop())
+        broadcast_task = asyncio.create_task(self.broadcast_loop())
         heartbeat_task = asyncio.create_task(self.heartbeat_loop())
 
         async with websockets.serve(self.handle_client, self.host, self.port,
@@ -123,6 +136,7 @@ class GameServer:
                 await asyncio.Future()
             except asyncio.CancelledError:
                 tick_task.cancel()
+                broadcast_task.cancel()
                 heartbeat_task.cancel()
                 raise
 

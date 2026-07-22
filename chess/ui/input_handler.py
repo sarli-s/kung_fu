@@ -29,9 +29,8 @@ class InputHandler:
             
             row, col = cell
             token = self.engine.cell(row, col)
-            # if my_color is set, block selecting enemy pieces
-            if self.my_color and token != "." and not token.startswith(self.my_color):
-                self.ctx["selected"] = None
+            # block selecting enemy pieces, but allow clicking them as capture destination
+            if self.my_color and token != "." and not token.startswith(self.my_color) and self.ctx["selected"] is None:
                 return
             
             if self.ctx["selected"] is not None and self.ctx["selected"] == cell:

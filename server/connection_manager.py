@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import websockets
+from server.messages import LoginOkMessage, LoginErrorMessage, ErrorMessage, to_json_dict
 
 logger = logging.getLogger(__name__)
 
@@ -15,21 +16,21 @@ class ConnectionManager:
             raw = await asyncio.wait_for(websocket.recv(), timeout=30)
             msg = json.loads(raw)
         except (asyncio.TimeoutError, json.JSONDecodeError):
-            await websocket.send(json.dumps({"type": "login_error", "reason": "Expected login message"}))
+            await websocket.send(json.dumps(to_json_dict(LoginErrorMessage(type="login_error", reason="Expected login message"))))
             return False
 
         if msg.get("type") != "login" or not msg.get("username"):
-            await websocket.send(json.dumps({"type": "login_error", "reason": "Expected login message"}))
+            await websocket.send(json.dumps(to_json_dict(LoginErrorMessage(type="login_error", reason="Expected login message"))))
             return False
 
         username = msg["username"]
         success, reason, color = self.server.lobby.join(room_id, websocket, username)
         if not success:
-            await websocket.send(json.dumps({"type": "login_error", "reason": reason}))
+            await websocket.send(json.dumps(to_json_dict(LoginErrorMessage(type="login_error", reason=reason))))
             return False
 
         self.server._player_info[websocket] = {"username": username, "color": color, "room_id": room_id}
-        await websocket.send(json.dumps({"type": "login_ok", "username": username, "color": color}))
+        await websocket.send(json.dumps(to_json_dict(LoginOkMessage(type="login_ok", username=username, color=color))))
         logger.info(f"Player '{username}' joined room '{room_id}' as {color}")
         return True
 
@@ -57,10 +58,10 @@ class ConnectionManager:
                     response = self.server.handle_command(room_id, command, player_id=websocket)
                     await websocket.send(json.dumps(response))
                 except json.JSONDecodeError:
-                    await websocket.send(json.dumps({"type": "error", "success": False, "reason": "Invalid JSON"}))
+                    await websocket.send(json.dumps(to_json_dict(ErrorMessage(type="error", success=False, reason="Invalid JSON"))))
                 except Exception as e:
                     logger.error(f"Error handling command: {e}", exc_info=True)
-                    await websocket.send(json.dumps({"type": "error", "success": False, "reason": str(e)}))
+                    await websocket.send(json.dumps(to_json_dict(ErrorMessage(type="error", success=False, reason=str(e)))))
         except websockets.exceptions.ConnectionClosed:
             logger.info("Client disconnected")
         finally:

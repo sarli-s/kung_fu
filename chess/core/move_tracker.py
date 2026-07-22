@@ -1,10 +1,12 @@
 import time
+from chess.config import PIECE_VALUES
 
 
 class MoveTracker:
     
     def __init__(self):
         self.moves = {"white": [], "black": []}
+        self.scores = {"white": 0, "black": 0}
         self.last_rendered_white = 0
         self.last_rendered_black = 0
     
@@ -37,13 +39,17 @@ class MoveTracker:
         }
         self.moves[player].append(move_entry)
     
-    def mark_capture(self, to_row, to_col, capturing_piece=None):
+    def mark_capture(self, to_row, to_col, capturing_piece=None, captured_piece=None):
         if not capturing_piece:
             return
         
         capturing_color = capturing_piece[0]
         capturing_player = "white" if capturing_color == "w" else "black"
         capturing_moves = self.moves[capturing_player]
+
+        if captured_piece:
+            piece_type = captured_piece[1] if len(captured_piece) > 1 else captured_piece[0]
+            self.scores[capturing_player] += PIECE_VALUES.get(piece_type, 0)
         
         # Reversed search because multiple pieces of the same type can share a destination; most recent is most likely correct.
         for move in reversed(capturing_moves):
@@ -53,6 +59,9 @@ class MoveTracker:
     
     def get_moves(self, player):
         return self.moves.get(player, [])
+
+    def get_score(self, player):
+        return self.scores.get(player, 0)
     
     def get_new_moves(self, player):
         if player == "white":
@@ -65,5 +74,6 @@ class MoveTracker:
     
     def clear(self):
         self.moves = {"white": [], "black": []}
+        self.scores = {"white": 0, "black": 0}
         self.last_rendered_white = 0
         self.last_rendered_black = 0

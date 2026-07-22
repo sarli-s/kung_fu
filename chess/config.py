@@ -11,6 +11,8 @@ PIECE_KING = "K"
 PIECE_PAWN = "P"
 PIECE_QUEEN = "Q"
 
+PIECE_VALUES = {"Q": 9, "R": 5, "B": 3, "N": 3, "P": 1}
+
 VALID_TOKENS = {
     EMPTY_CELL,
     "wK", "bK", "wQ", "bQ", "wR", "bR", "wN", "bN", "wB", "bB", "wP", "bP"

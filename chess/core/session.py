@@ -33,8 +33,8 @@ class GameEngine(EventEmitter):
                     starts[(r, c)] = r
         return starts
 
-    def _on_capture_event(self, row, col, by=None, **_):
-        self.move_tracker.mark_capture(row, col, capturing_piece=by)
+    def _on_capture_event(self, row, col, by=None, captured=None, **_):
+        self.move_tracker.mark_capture(row, col, capturing_piece=by, captured_piece=captured)
 
     def cell(self, row, col):
         return self._board.cell(row, col)
