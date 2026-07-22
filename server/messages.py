@@ -34,6 +34,8 @@ class BoardStateMessage:
     moves: dict
     players: dict
     game_over: bool
+    scores: dict
+    elapsed_ms: float
 
 
 @dataclass(frozen=True)

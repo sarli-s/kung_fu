@@ -16,7 +16,9 @@ def run_gui():
         "wR wN wB wK wQ wB wN wR",  # row 7 (bottom)
     ]
     
+    player_names = {"white": "White", "black": "Black"}
+
     engine = build_board(board_lines)
     renderer = BoardRenderer()
-    display_loop = DisplayLoop(engine, renderer)
+    display_loop = DisplayLoop(engine, renderer, player_names=player_names)
     display_loop.run()

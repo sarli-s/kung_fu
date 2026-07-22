@@ -22,6 +22,8 @@ class BoardProxy:
         self._move_cmds: dict[str, MoveCommand] = {}
         self.players: dict[str, str] = {}  # color -> username
         self.game_over = False
+        self.scores: dict[str, int] = {"white": 0, "black": 0}
+        self.elapsed_ms: float = 0.0
         self.move_tracker = MoveTracker()
         self._out_q = out_q
         self._color: str | None = None
@@ -30,7 +32,7 @@ class BoardProxy:
     def set_color(self, color: str):
         self._color = color
 
-    def update(self, board, game_over, states=None, moves=None, players=None):
+    def update(self, board, game_over, states=None, moves=None, players=None, scores=None, elapsed_ms=None):
         with self._lock:
             self._board = board
             self._states = states or {}
@@ -40,6 +42,10 @@ class BoardProxy:
                 self.move_tracker.moves["black"] = moves["black"]
             if players:
                 self.players = players
+            if scores:
+                self.scores = scores
+            if elapsed_ms is not None:
+                self.elapsed_ms = elapsed_ms
             # rebuild local MoveCommand objects from server state
             new_cmds = {}
             for key, info in self._states.items():
@@ -164,7 +170,8 @@ class ClientGUI:
                         await ws.send(json.dumps({"type": "pong"}))
                     elif msg_type == "board_state":
                         self.proxy.update(msg["board"], msg.get("game_over", False),
-                                          msg.get("states"), msg.get("moves"), msg.get("players"))
+                                          msg.get("states"), msg.get("moves"), msg.get("players"),
+                                          msg.get("scores"), msg.get("elapsed_ms"))
                     elif msg_type == "game_over":
                         self.proxy.update(self.proxy._board, True)
                         self.stop_event.set()

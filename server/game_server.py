@@ -1,4 +1,5 @@
 import asyncio
+import time
 import websockets
 import json
 import logging
@@ -67,7 +68,13 @@ class GameServer:
                     states[key] = to_json_dict(PieceStateSimple(state="short_rest"))
                 elif engine.is_long_rest(row, col):
                     states[key] = to_json_dict(PieceStateSimple(state="long_rest"))
-        players = {p["color"]: p["username"] for p in self.lobby._rooms.get(room_id, [])}
+        color_map = {"w": "white", "b": "black"}
+        players = {color_map[p["color"]]: p["username"] for p in self.lobby._rooms.get(room_id, [])}
+        scores = {
+            "white": engine.move_tracker.get_score("white"),
+            "black": engine.move_tracker.get_score("black"),
+        }
+        elapsed_ms = (time.time() - engine.start_time) * 1000
         msg = BoardStateMessage(
             type="board_state",
             room_id=room_id,
@@ -79,6 +86,8 @@ class GameServer:
             },
             players=players,
             game_over=engine.game_over,
+            scores=scores,
+            elapsed_ms=elapsed_ms,
         )
         return to_json_dict(msg)
 

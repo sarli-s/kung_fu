@@ -55,6 +55,7 @@ class MoveTracker:
         for move in reversed(capturing_moves):
             if move["to"] == (to_row, to_col):
                 move["is_capture"] = True
+                move["captured_piece"] = captured_piece
                 return
     
     def get_moves(self, player):

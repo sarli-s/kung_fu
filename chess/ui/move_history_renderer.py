@@ -48,32 +48,106 @@ class MoveHistoryRenderer:
         
         return row_img
     
-    def render_panel(self, move_tracker, player, board_height, username=None):
+    def _render_captured_strip(self, moves, is_white):
+        icon_size = 24
+        padding = 4
+        bg = (230, 230, 230) if is_white else (50, 50, 50)
+
+        captured_tokens = [
+            m["captured_piece"] for m in moves
+            if m.get("is_capture") and m.get("captured_piece")
+        ]
+        if not captured_tokens:
+            return None
+
+        icons_per_row = max(1, (self.panel_width - padding) // (icon_size + 2))
+        num_rows = (len(captured_tokens) + icons_per_row - 1) // icons_per_row
+        row_h = icon_size + padding * 2
+        strip = np.ones((row_h * num_rows, self.panel_width, 3), dtype=np.uint8)
+        strip[:] = bg
+
+        for i, token in enumerate(captured_tokens):
+            row_idx = i // icons_per_row
+            col_idx = i % icons_per_row
+            x = padding + col_idx * (icon_size + 2)
+            y = row_idx * row_h + padding
+            sprite = self.asset_loader.get_piece_sprite(token, state="idle", sprite_idx=0)
+            if sprite is None:
+                continue
+            h, w = sprite.shape[:2]
+            scale = icon_size / max(w, h)
+            sw, sh = int(w * scale), int(h * scale)
+            sprite_small = cv2.resize(sprite, (sw, sh), interpolation=cv2.INTER_AREA)
+            yo = y + (icon_size - sh) // 2
+            xo = x + (icon_size - sw) // 2
+            if sprite_small.shape[2] == 4:
+                alpha = sprite_small[:, :, 3] / 255.0
+                for c in range(3):
+                    strip[yo:yo+sh, xo:xo+sw, c] = (
+                        (1 - alpha) * strip[yo:yo+sh, xo:xo+sw, c] +
+                        alpha * sprite_small[:, :, c]
+                    )
+            else:
+                strip[yo:yo+sh, xo:xo+sw] = sprite_small
+
+        return strip
+
+    def render_panel(self, move_tracker, player, board_height, username=None, score=0, elapsed_ms=0):
         is_white = player == "white"
         panel_rows = self.white_panel_rows if is_white else self.black_panel_rows
         new_moves = move_tracker.get_new_moves(player)
-        
+
         for move in new_moves:
             row_img = self.render_move_row(move)
             panel_rows.append(row_img)
 
-        # header
-        header_h = 50
+        # --- header ---
+        header_h = 90
         header = np.zeros((header_h, self.panel_width, 3), dtype=np.uint8)
-        color_bgr = (220, 220, 220) if is_white else (60, 60, 60)
-        text_color = (30, 30, 30) if is_white else (220, 220, 220)
-        header[:] = color_bgr
-        # color dot
-        cx, cy = 14, header_h // 2
-        dot_color = (255, 255, 255) if is_white else (20, 20, 20)
-        cv2.circle(header, (cx, cy), 10, dot_color, -1)
-        cv2.circle(header, (cx, cy), 10, (100, 100, 100), 1)
-        # name
-        label = username or player.capitalize()
-        cv2.putText(header, label, (30, cy + 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.42, text_color, 1, cv2.LINE_AA)
 
-        content_height = board_height - header_h
+        bg     = (240, 240, 240) if is_white else (40, 40, 40)
+        accent = (200, 200, 200) if is_white else (70, 70, 70)
+        fg     = (30,  30,  30)  if is_white else (220, 220, 220)
+        header[:] = bg
+
+        # top accent stripe
+        header[:6, :] = accent
+
+        # color circle
+        dot_fill   = (255, 255, 255) if is_white else (15, 15, 15)
+        dot_border = (160, 160, 160) if is_white else (120, 120, 120)
+        cv2.circle(header, (18, 28), 11, dot_fill,   -1, cv2.LINE_AA)
+        cv2.circle(header, (18, 28), 11, dot_border,  1, cv2.LINE_AA)
+
+        # username — large
+        label = (username or player.capitalize())[:14]
+        cv2.putText(header, label, (36, 34),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.55, fg, 1, cv2.LINE_AA)
+
+        # color badge
+        badge_text = "White" if is_white else "Black"
+        badge_bg   = (180, 180, 180) if is_white else (80, 80, 80)
+        badge_fg   = (50,  50,  50)  if is_white else (200, 200, 200)
+        (bw, bh), _ = cv2.getTextSize(badge_text, cv2.FONT_HERSHEY_SIMPLEX, 0.32, 1)
+        bx, by = 8, 52
+        cv2.rectangle(header, (bx - 3, by - bh - 2), (bx + bw + 3, by + 3), badge_bg, -1, cv2.LINE_AA)
+        cv2.putText(header, badge_text, (bx, by),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.32, badge_fg, 1, cv2.LINE_AA)
+
+        # score
+        cv2.putText(header, f"Score: {score}", (8, 76),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, fg, 1, cv2.LINE_AA)
+
+        # timer (right-aligned)
+        total_s    = int(elapsed_ms / 1000)
+        timer_text = f"{total_s // 60:02d}:{total_s % 60:02d}"
+        (tw, _), _ = cv2.getTextSize(timer_text, cv2.FONT_HERSHEY_SIMPLEX, 0.38, 1)
+        cv2.putText(header, timer_text, (self.panel_width - tw - 8, 76),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, fg, 1, cv2.LINE_AA)
+
+        captured_strip = self._render_captured_strip(move_tracker.get_moves(player), is_white)
+        header_total = np.vstack([header, captured_strip]) if captured_strip is not None else header
+        content_height = board_height - header_total.shape[0]
         if not panel_rows:
             body = np.ones((content_height, self.panel_width, 3), dtype=np.uint8) * 220
         else:
@@ -89,7 +163,7 @@ class MoveHistoryRenderer:
             elif body.shape[0] > content_height:
                 body = body[-content_height:, :]
 
-        return np.vstack([header, body])
+        return np.vstack([header_total, body])
     
     def clear(self):
         self.white_panel_rows = []

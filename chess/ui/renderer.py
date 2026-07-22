@@ -16,8 +16,9 @@ class BoardRenderer:
         self.board_bg = self.asset_loader.get_board_background()
         self.move_history_renderer = MoveHistoryRenderer(self.asset_loader)
 
-    def render(self, engine, selected_cell=None, delta_ms=0, player_names=None):
+    def render(self, engine, selected_cell=None, delta_ms=0, player_names=None, scores=None, elapsed_ms=0):
         player_names = player_names or {}
+        scores = scores or {}
         board_canvas = self.board_bg.copy()
         board_canvas_img = Img(board_canvas)
 
@@ -52,8 +53,8 @@ class BoardRenderer:
         if board_canvas.shape[2] == 4:  # np.hstack requires matching channel counts; alpha must be stripped first
             board_canvas = cv2.cvtColor(board_canvas, cv2.COLOR_BGRA2BGR)
 
-        white_panel = self.move_history_renderer.render_panel(engine.move_tracker, "white", board_height, username=player_names.get("white"))
-        black_panel = self.move_history_renderer.render_panel(engine.move_tracker, "black", board_height, username=player_names.get("black"))
+        white_panel = self.move_history_renderer.render_panel(engine.move_tracker, "white", board_height, username=player_names.get("white"), score=scores.get("white", 0), elapsed_ms=elapsed_ms)
+        black_panel = self.move_history_renderer.render_panel(engine.move_tracker, "black", board_height, username=player_names.get("black"), score=scores.get("black", 0), elapsed_ms=elapsed_ms)
 
         canvas = np.hstack([white_panel, board_canvas, black_panel])
 

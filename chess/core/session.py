@@ -1,3 +1,4 @@
+import time
 from chess.entities.move_command import MoveCommand
 from chess.entities.jump import JumpCommand
 from chess.entities.pieces.factory import PieceFactory
@@ -18,6 +19,7 @@ class GameEngine(EventEmitter):
         self._config = config or ChessConfig
         self._clock = RealTimeArbiter(self._config)
         self.game_over = False
+        self.start_time = time.time()
         self._pawn_start_rows = self._record_pawn_starts()
         self.move_tracker = MoveTracker()
         self.subscribe("on_move", self.move_tracker.on_move)
