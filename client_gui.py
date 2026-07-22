@@ -3,6 +3,7 @@ import queue
 import asyncio
 import json
 import sys
+import getpass
 import websockets
 from chess.ui.renderer import BoardRenderer
 from chess.ui.display import DisplayLoop
@@ -120,9 +121,10 @@ class BoardProxy:
 
 
 class ClientGUI:
-    def __init__(self, uri: str, username: str):
+    def __init__(self, uri: str, username: str, password: str | None = None):
         self.uri = uri
         self.username = username
+        self.password = password or ""
         self.out_q: queue.Queue = queue.Queue()
         self.proxy = BoardProxy(self.out_q)
         self.stop_event = threading.Event()
@@ -137,10 +139,13 @@ class ClientGUI:
         t.start()
         return t
 
+    def build_login_payload(self):
+        return {"type": "login", "username": self.username, "password": self.password}
+
     async def _ws_loop(self):
         try:
             async with websockets.connect(self.uri) as ws:
-                await ws.send(json.dumps({"type": "login", "username": self.username}))
+                await ws.send(json.dumps(self.build_login_payload()))
                 raw = await ws.recv()
                 msg = json.loads(raw)
                 if msg.get("type") != "login_ok":
@@ -195,4 +200,5 @@ class ClientGUI:
 if __name__ == "__main__":
     uri = sys.argv[1] if len(sys.argv) > 1 else "ws://localhost:8765"
     username = sys.argv[2] if len(sys.argv) > 2 else input("Username: ")
-    ClientGUI(uri, username).run()
+    password = sys.argv[3] if len(sys.argv) > 3 else getpass.getpass("Password: ")
+    ClientGUI(uri, username, password).run()

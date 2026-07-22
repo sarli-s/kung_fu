@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import websockets
+import server.db as db
 from server.messages import LoginOkMessage, LoginErrorMessage, ErrorMessage, to_json_dict
 
 logger = logging.getLogger(__name__)
@@ -24,14 +25,33 @@ class ConnectionManager:
             return False
 
         username = msg["username"]
+        password = msg.get("password")
+
+        if not password:
+            await websocket.send(json.dumps(to_json_dict(LoginErrorMessage(type="login_error", reason="Password is required"))))
+            return False
+
+        ok, reason = await db.verify(username, password)
+        if ok:
+            pass
+        elif reason == "user not found":
+            ok, reason = await db.register(username, password)
+            if not ok:
+                await websocket.send(json.dumps(to_json_dict(LoginErrorMessage(type="login_error", reason=reason))))
+                return False
+        else:
+            await websocket.send(json.dumps(to_json_dict(LoginErrorMessage(type="login_error", reason=reason))))
+            return False
+
         success, reason, color = self.server.lobby.join(room_id, websocket, username)
         if not success:
             await websocket.send(json.dumps(to_json_dict(LoginErrorMessage(type="login_error", reason=reason))))
             return False
 
-        self.server._player_info[websocket] = {"username": username, "color": color, "room_id": room_id}
-        await websocket.send(json.dumps(to_json_dict(LoginOkMessage(type="login_ok", username=username, color=color))))
-        logger.info(f"Player '{username}' joined room '{room_id}' as {color}")
+        elo = await db.get_elo(username)
+        self.server._player_info[websocket] = {"username": username, "color": color, "room_id": room_id, "elo": elo}
+        await websocket.send(json.dumps(to_json_dict(LoginOkMessage(type="login_ok", username=username, color=color, elo=elo or 1200))))
+        logger.info(f"Player '{username}' (elo={elo}) joined room '{room_id}' as {color}")
         return True
 
     async def handle_client(self, websocket):

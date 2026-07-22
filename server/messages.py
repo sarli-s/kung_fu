@@ -43,6 +43,7 @@ class LoginOkMessage:
     type: str
     username: str
     color: str
+    elo: int = 1200
 
 
 @dataclass(frozen=True)
