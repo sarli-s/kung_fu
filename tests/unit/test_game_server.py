@@ -94,7 +94,7 @@ async def test_game_server_rejects_invalid_move_command():
 
             assert data["type"] == "move_response"
             assert data["success"] is False
-            assert data["reason"] == "Move rejected by engine"
+            assert data["reason"] in ("Not your piece", "Move rejected by engine")
     finally:
         server_task.cancel()
         try:

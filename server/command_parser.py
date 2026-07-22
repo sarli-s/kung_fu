@@ -28,12 +28,17 @@ class MoveValidator:
         
         return from_row, from_col, to_row, to_col
 
-    def execute_move(self, notation):
+    def execute_move(self, notation, player_color=None):
         from_row, from_col, to_row, to_col = self.parse_chess_notation(notation)
-        
+
         if from_row is None:
             return False, "Invalid notation format (expected e2e4)"
-        
+
+        if player_color is not None:
+            cell = self.engine.cell(from_row, from_col)
+            if not cell or not cell.startswith(player_color):
+                return False, "Not your piece"
+
         was_moving = self.engine.is_moving(from_row, from_col)
         self.engine.request_move(from_row, from_col, to_row, to_col)
         # Infer success via state transition — avoids reimplementing engine legality logic

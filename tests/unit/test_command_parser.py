@@ -87,6 +87,23 @@ class TestMoveValidator:
         assert not valid
         assert reason == "Invalid notation format (expected e2e4)"
 
+    def test_execute_move_rejects_opponent_piece(self, engine):
+        """Player cannot move the opponent's piece."""
+        validator = MoveValidator(engine)
+
+        # e7e5: black pawn — white player tries to move it
+        valid, reason = validator.execute_move("e7e5", player_color="w")
+        assert not valid
+        assert reason == "Not your piece"
+
+    def test_execute_move_allows_own_piece(self, engine):
+        """Player can move their own piece when color matches."""
+        validator = MoveValidator(engine)
+
+        valid, reason = validator.execute_move("e2e4", player_color="w")
+        assert valid
+        assert reason == "Move executed"
+
     def test_execute_move_already_moving(self, engine):
         """Execute move on piece that's already moving."""
         validator = MoveValidator(engine)

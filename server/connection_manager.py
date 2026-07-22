@@ -54,7 +54,7 @@ class ConnectionManager:
                     if command.get("type") == "pong":
                         self.server._loops.record_pong(websocket)
                         continue
-                    response = self.server.handle_command(room_id, command)
+                    response = self.server.handle_command(room_id, command, player_id=websocket)
                     await websocket.send(json.dumps(response))
                 except json.JSONDecodeError:
                     await websocket.send(json.dumps({"type": "error", "success": False, "reason": "Invalid JSON"}))

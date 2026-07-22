@@ -14,7 +14,7 @@ class Broadcaster:
             exc = task.exception()
             if exc:
                 logger.error("Broadcast task raised an exception: %s", exc, exc_info=exc)
-        task = asyncio.get_event_loop().create_task(coro)
+        task = asyncio.get_running_loop().create_task(coro)
         task.add_done_callback(_log_exc)
 
     async def _send_all(self, message: str):

@@ -4,9 +4,10 @@ from chess.ui.config import BOARD_BORDER_X, BOARD_BORDER_Y, MARGINS_LEFT
 
 
 class InputHandler:
-    def __init__(self, engine, ctx):
+    def __init__(self, engine, ctx, my_color=None):
         self.engine = engine
         self.ctx = ctx
+        self.my_color = my_color
 
     def on_mouse_event(self, event, x, y, flags, param):
         x_adjusted = x - MARGINS_LEFT
@@ -26,8 +27,14 @@ class InputHandler:
             if cell is None:
                 return
             
+            row, col = cell
+            token = self.engine.cell(row, col)
+            # if my_color is set, block selecting enemy pieces
+            if self.my_color and token != "." and not token.startswith(self.my_color):
+                self.ctx["selected"] = None
+                return
+            
             if self.ctx["selected"] is not None and self.ctx["selected"] == cell:
-                row, col = cell
                 handle_commands(self.engine, [f"jump {x_adjusted} {y}"], handlers=COMMAND_HANDLERS, ctx=self.ctx)
             else:
                 handle_commands(self.engine, [f"click {x_adjusted} {y}"], handlers=COMMAND_HANDLERS, ctx=self.ctx)

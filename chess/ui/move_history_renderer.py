@@ -48,7 +48,7 @@ class MoveHistoryRenderer:
         
         return row_img
     
-    def render_panel(self, move_tracker, player, board_height):
+    def render_panel(self, move_tracker, player, board_height, username=None):
         is_white = player == "white"
         panel_rows = self.white_panel_rows if is_white else self.black_panel_rows
         new_moves = move_tracker.get_new_moves(player)
@@ -56,25 +56,40 @@ class MoveHistoryRenderer:
         for move in new_moves:
             row_img = self.render_move_row(move)
             panel_rows.append(row_img)
-        
+
+        # header
+        header_h = 50
+        header = np.zeros((header_h, self.panel_width, 3), dtype=np.uint8)
+        color_bgr = (220, 220, 220) if is_white else (60, 60, 60)
+        text_color = (30, 30, 30) if is_white else (220, 220, 220)
+        header[:] = color_bgr
+        # color dot
+        cx, cy = 14, header_h // 2
+        dot_color = (255, 255, 255) if is_white else (20, 20, 20)
+        cv2.circle(header, (cx, cy), 10, dot_color, -1)
+        cv2.circle(header, (cx, cy), 10, (100, 100, 100), 1)
+        # name
+        label = username or player.capitalize()
+        cv2.putText(header, label, (30, cy + 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.42, text_color, 1, cv2.LINE_AA)
+
+        content_height = board_height - header_h
         if not panel_rows:
-            return np.ones((board_height, self.panel_width, 3), dtype=np.uint8) * 220
-        
-        total_height = len(panel_rows) * self.row_height
-        if total_height > board_height:
-            visible_rows = panel_rows[-(board_height // self.row_height):]
+            body = np.ones((content_height, self.panel_width, 3), dtype=np.uint8) * 220
         else:
-            visible_rows = panel_rows
-        
-        panel_img = np.vstack(visible_rows) if visible_rows else np.ones((board_height, self.panel_width, 3), dtype=np.uint8) * 220
-        
-        if panel_img.shape[0] < board_height:
-            padding = np.ones((board_height - panel_img.shape[0], self.panel_width, 3), dtype=np.uint8) * 220
-            panel_img = np.vstack([padding, panel_img])
-        elif panel_img.shape[0] > board_height:
-            panel_img = panel_img[-board_height:, :]
-        
-        return panel_img
+            total_height = len(panel_rows) * self.row_height
+            if total_height > content_height:
+                visible_rows = panel_rows[-(content_height // self.row_height):]
+            else:
+                visible_rows = panel_rows
+            body = np.vstack(visible_rows)
+            if body.shape[0] < content_height:
+                padding = np.ones((content_height - body.shape[0], self.panel_width, 3), dtype=np.uint8) * 220
+                body = np.vstack([padding, body])
+            elif body.shape[0] > content_height:
+                body = body[-content_height:, :]
+
+        return np.vstack([header, body])
     
     def clear(self):
         self.white_panel_rows = []

@@ -10,21 +10,23 @@ class LoopRunner:
         self.server = server
 
     def record_pong(self, websocket):
-        self.server.last_pong[websocket] = asyncio.get_event_loop().time()
+        self.server.last_pong[websocket] = asyncio.get_running_loop().time()
 
     async def tick_loop(self):
         logger.info(f"Tick loop started (tick_rate={self.server.tick_rate_ms}ms)")
         tick_interval = self.server.tick_rate_ms / 1000.0
-        next_tick = asyncio.get_event_loop().time() + tick_interval
-        last_tick = asyncio.get_event_loop().time()
+        loop = asyncio.get_running_loop()
+        next_tick = loop.time() + tick_interval
+        last_tick = loop.time()
 
-        # TODO stage 6: remove this loop; wire() moves to room-creation time
+        # Wires event listeners for all existing rooms at startup.
+        # When room creation is dynamic (stage 6), this moves to room-creation time.
         for room_id in self.server.rooms_manager.rooms:
             self.server._wirer.wire(room_id)
 
         while True:
             try:
-                now = asyncio.get_event_loop().time()
+                now = asyncio.get_running_loop().time()
                 elapsed_ms = (now - last_tick) * 1000.0
                 last_tick = now
 
@@ -35,7 +37,7 @@ class LoopRunner:
             except Exception as e:
                 logger.error(f"Error in tick loop: {e}", exc_info=True)
 
-            now = asyncio.get_event_loop().time()
+            now = asyncio.get_running_loop().time()
             delay = max(0.0, next_tick - now)
             await asyncio.sleep(delay)
             next_tick += tick_interval
@@ -43,7 +45,7 @@ class LoopRunner:
     async def heartbeat_loop(self):
         logger.info(f"Heartbeat loop started (interval={self.server.ping_interval_s}s, "
                     f"timeout={self.server.ping_timeout_s}s)")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         next_ping = loop.time() + self.server.ping_interval_s
 
         while True:

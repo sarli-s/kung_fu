@@ -45,23 +45,49 @@ class GameServer:
             for col in range(engine.cols()):
                 row_data.append(engine.cell(row, col))
             board_data.append(row_data)
+        states = {}
+        for row in range(engine.rows()):
+            for col in range(engine.cols()):
+                if engine.is_airborne(row, col):
+                    states[f"{row},{col}"] = {"state": "airborne"}
+                elif engine.is_moving(row, col):
+                    cmd = engine.get_move_command(row, col)
+                    states[f"{row},{col}"] = {
+                        "state": "moving",
+                        "from_row": cmd.from_row, "from_col": cmd.from_col,
+                        "to_row": cmd.to_row, "to_col": cmd.to_col,
+                        "elapsed": cmd.elapsed,
+                        "checkpoints": cmd.checkpoints,
+                    }
+                elif engine.is_short_rest(row, col):
+                    states[f"{row},{col}"] = {"state": "short_rest"}
+                elif engine.is_long_rest(row, col):
+                    states[f"{row},{col}"] = {"state": "long_rest"}
+        players = {p["color"]: p["username"] for p in self.lobby._rooms.get(room_id, [])}
         return {
             "type": "board_state",
             "room_id": room_id,
             "board": board_data,
+            "states": states,
+            "moves": {
+                "white": engine.move_tracker.moves["white"],
+                "black": engine.move_tracker.moves["black"],
+            },
+            "players": players,
             "game_over": engine.game_over,
         }
 
-    def handle_command(self, room_id, command):
+    def handle_command(self, room_id, command, player_id=None):
         engine = self.rooms_manager.get_room(room_id)
         if not engine:
             return {"type": "error", "success": False, "reason": "Room not found"}
 
         cmd_type = command.get("type")
         cmd_data = command.get("data", "")
+        player_color = self.lobby.get_color(room_id, player_id) if player_id else None
 
         if cmd_type == "move":
-            valid, reason = MoveValidator(engine).execute_move(cmd_data)
+            valid, reason = MoveValidator(engine).execute_move(cmd_data, player_color=player_color)
             return {"type": "move_response", "success": valid, "reason": reason, "notation": cmd_data}
 
         if cmd_type == "jump":
