@@ -9,7 +9,7 @@ from pathlib import Path
 @pytest.fixture(autouse=True)
 def isolated_db(tmp_path, monkeypatch):
     """Each test gets its own fresh DB file."""
-    import server.db as db_module
+    import server.persistence.db as db_module
     test_db = tmp_path / "test_users.db"
     monkeypatch.setattr(db_module, "DB_PATH", test_db)
     # Re-run init so the table is created in the temp DB
@@ -19,7 +19,7 @@ def isolated_db(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_register_new_user():
-    import server.db as db
+    import server.persistence.db as db
     ok, msg = await db.register("alice", "secret")
     assert ok
     assert msg == "registered"
@@ -27,7 +27,7 @@ async def test_register_new_user():
 
 @pytest.mark.asyncio
 async def test_register_duplicate_username():
-    import server.db as db
+    import server.persistence.db as db
     await db.register("alice", "secret")
     ok, msg = await db.register("alice", "other")
     assert not ok
@@ -36,7 +36,7 @@ async def test_register_duplicate_username():
 
 @pytest.mark.asyncio
 async def test_verify_correct_password():
-    import server.db as db
+    import server.persistence.db as db
     await db.register("alice", "secret")
     ok, msg = await db.verify("alice", "secret")
     assert ok
@@ -45,7 +45,7 @@ async def test_verify_correct_password():
 
 @pytest.mark.asyncio
 async def test_verify_wrong_password():
-    import server.db as db
+    import server.persistence.db as db
     await db.register("alice", "secret")
     ok, msg = await db.verify("alice", "wrong")
     assert not ok
@@ -54,7 +54,7 @@ async def test_verify_wrong_password():
 
 @pytest.mark.asyncio
 async def test_verify_unknown_user():
-    import server.db as db
+    import server.persistence.db as db
     ok, msg = await db.verify("nobody", "x")
     assert not ok
     assert "not found" in msg
@@ -62,7 +62,7 @@ async def test_verify_unknown_user():
 
 @pytest.mark.asyncio
 async def test_new_user_starts_at_1200():
-    import server.db as db
+    import server.persistence.db as db
     await db.register("alice", "secret")
     elo = await db.get_elo("alice")
     assert elo == 1200
@@ -70,14 +70,14 @@ async def test_new_user_starts_at_1200():
 
 @pytest.mark.asyncio
 async def test_get_elo_unknown_user_returns_none():
-    import server.db as db
+    import server.persistence.db as db
     elo = await db.get_elo("nobody")
     assert elo is None
 
 
 @pytest.mark.asyncio
 async def test_update_elos_winner_gains_loser_loses():
-    import server.db as db
+    import server.persistence.db as db
     await db.register("alice", "a")
     await db.register("bob", "b")
     await db.update_elos(winner="alice", loser="bob")
@@ -91,7 +91,7 @@ async def test_update_elos_winner_gains_loser_loses():
 @pytest.mark.asyncio
 async def test_update_elos_equal_players_delta_is_16():
     """Equal ELO players: expected = 0.5, delta = round(32 * 0.5) = 16."""
-    import server.db as db
+    import server.persistence.db as db
     await db.register("alice", "a")
     await db.register("bob", "b")
     await db.update_elos(winner="alice", loser="bob")

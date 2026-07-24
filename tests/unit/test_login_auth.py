@@ -4,7 +4,7 @@ import pytest
 import asyncio
 import json
 import websockets
-import server.db as db_module
+import server.persistence.db as db_module
 from server.game_server import GameServer
 
 

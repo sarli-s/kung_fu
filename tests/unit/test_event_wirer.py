@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 
-import server.event_wirer as ew
+import server.game.event_wirer as ew
 
 
 class FakeEngine:

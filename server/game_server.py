@@ -3,14 +3,14 @@ import time
 import websockets
 import json
 import logging
-from server.rooms_manager import RoomsManager
-from server.command_parser import MoveValidator, JumpValidator
-from server.lobby import LobbyManager
-from server.connection_manager import ConnectionManager
-from server.broadcaster import Broadcaster
-from server.event_wirer import EventWirer
-from server.loop_runner import LoopRunner
-from server.messages import (
+from server.game.rooms_manager import RoomsManager
+from server.protocol.command_parser import MoveValidator, JumpValidator
+from server.game.lobby import LobbyManager
+from server.network.connection_manager import ConnectionManager
+from server.network.broadcaster import Broadcaster
+from server.game.event_wirer import EventWirer
+from server.network.loop_runner import LoopRunner
+from server.protocol.messages import (
     BoardStateMessage, PieceStateSimple, PieceStateMoving,
     MoveResponseMessage, JumpResponseMessage, ErrorMessage, to_json_dict
 )

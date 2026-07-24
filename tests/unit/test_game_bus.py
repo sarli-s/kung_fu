@@ -2,7 +2,7 @@
 
 import pytest
 from chess.services.board_builder import build_board
-from server.game_bus import GameBus
+from server.game.game_bus import GameBus
 
 
 @pytest.fixture

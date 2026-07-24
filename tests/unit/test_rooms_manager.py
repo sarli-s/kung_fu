@@ -1,7 +1,7 @@
 """Tests for RoomsManager (stage 2c)."""
 
 import pytest
-from server.rooms_manager import RoomsManager
+from server.game.rooms_manager import RoomsManager
 
 
 class TestRoomsManager:

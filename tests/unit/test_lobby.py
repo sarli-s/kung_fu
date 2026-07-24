@@ -1,6 +1,6 @@
 """Unit tests for LobbyManager (stage 3)."""
 
-from server.lobby import LobbyManager
+from server.game.lobby import LobbyManager
 
 
 def test_first_player_gets_white():

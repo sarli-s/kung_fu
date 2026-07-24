@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-import server.connection_manager as cm
+import server.network.connection_manager as cm
 
 
 class FakeWebsocket:

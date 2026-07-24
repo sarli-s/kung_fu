@@ -10,7 +10,7 @@ import sqlite3
 import bcrypt
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "users.db"
+DB_PATH = Path(__file__).parent.parent / "users.db"
 STARTING_ELO = 1200
 ELO_K = 32
 

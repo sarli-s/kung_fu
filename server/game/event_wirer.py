@@ -1,8 +1,8 @@
 import asyncio
 import logging
-from server.game_bus import GameBus
-from server.command_parser import coords_to_notation
-import server.db as db
+from server.game.game_bus import GameBus
+from server.protocol.command_parser import coords_to_notation
+import server.persistence.db as db
 
 logger = logging.getLogger(__name__)
 

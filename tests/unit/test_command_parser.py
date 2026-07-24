@@ -2,7 +2,7 @@
 
 import pytest
 from chess.services.board_builder import build_board
-from server.command_parser import MoveValidator, JumpValidator
+from server.protocol.command_parser import MoveValidator, JumpValidator
 
 
 @pytest.fixture

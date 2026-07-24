@@ -9,7 +9,7 @@ from chess.ui.renderer import BoardRenderer
 from chess.ui.display import DisplayLoop
 from chess.core.move_tracker import MoveTracker
 from chess.entities.move_command import MoveCommand
-from server.command_parser import coords_to_notation
+from server.protocol.command_parser import coords_to_notation
 
 
 class BoardProxy:

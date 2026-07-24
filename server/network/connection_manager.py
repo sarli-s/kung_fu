@@ -2,8 +2,8 @@ import asyncio
 import json
 import logging
 import websockets
-import server.db as db
-from server.messages import LoginOkMessage, LoginErrorMessage, ErrorMessage, to_json_dict
+import server.persistence.db as db
+from server.protocol.messages import LoginOkMessage, LoginErrorMessage, ErrorMessage, to_json_dict
 
 logger = logging.getLogger(__name__)
 
